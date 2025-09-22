@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEditor;
 
+// Make it available globally without additional using statements
 namespace MCPForUnity.Editor.Helpers
 {
     /// <summary>
