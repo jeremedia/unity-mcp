@@ -220,6 +220,36 @@ namespace MCPForUnity.Editor.Helpers
             }
             // --- End Special handling for Camera ---
 
+            // --- Special handling for CE Builders ---
+            if (CEBuilderSerializer.IsCEBuilder(c))
+            {
+                Debug.Log($"[GetComponentData] Detected CE Builder: {componentType.FullName}");
+
+                var data = new Dictionary<string, object>
+                {
+                    { "typeName", componentType.FullName },
+                    { "instanceID", c.GetInstanceID() },
+                    { "isCEBuilder", true }
+                };
+
+                // Extract control surface for CE Builders
+                var controlSurface = CEBuilderSerializer.GetCEBuilderControlSurface(c);
+                if (controlSurface != null)
+                {
+                    data["controlSurface"] = controlSurface.ToObject<object>();
+
+                    // Also generate MCP tool definition
+                    var toolDef = CEBuilderSerializer.GenerateMCPToolDefinition(controlSurface);
+                    if (toolDef != null)
+                    {
+                        data["mcpToolDefinition"] = toolDef.ToObject<object>();
+                    }
+                }
+
+                return data;
+            }
+            // --- End Special handling for CE Builders ---
+
             var data = new Dictionary<string, object>
             {
                 { "typeName", componentType.FullName },
