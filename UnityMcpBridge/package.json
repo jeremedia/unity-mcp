@@ -1,11 +1,11 @@
 {
-  "name": "com.coplaydev.unity-mcp",
-  "version": "3.4.0",
-  "displayName": "MCP for Unity",
-  "description": "A bridge that connects an LLM to Unity via the MCP (Model Context Protocol). This allows MCP Clients like Claude Desktop or Cursor to directly control your Unity Editor.\n\nJoin Our Discord: https://discord.gg/y4p8KfzrN4",
+  "name": "com.curationengine.unity-mcp-ce",
+  "version": "3.4.0-ce.1",
+  "displayName": "MCP for Unity - Curation Engine Edition",
+  "description": "Unity MCP bridge enhanced for Curation Engine with Odin Inspector control surface extraction and natural language exhibition creation tools. Fork of CoplayDev/unity-mcp with CE-specific Builder support.\n\nBased on: https://github.com/CoplayDev/unity-mcp",
   "unity": "2021.3",
-  "documentationUrl": "https://github.com/CoplayDev/unity-mcp",
-  "licensesUrl": "https://github.com/CoplayDev/unity-mcp/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/jeremedia/unity-mcp/tree/ce-builder-integration",
+  "licensesUrl": "https://github.com/jeremedia/unity-mcp/blob/ce-builder-integration/LICENSE",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.0.2"
   },
@@ -16,9 +16,19 @@
     "mcp",
     "model-context-protocol",
     "mcp-server",
-    "mcp-client"
+    "mcp-client",
+    "curation-engine",
+    "odin-inspector",
+    "exhibition",
+    "museum",
+    "gallery"
   ],
   "author": {
+    "name": "Curation Engine Team (Fork by Jeremy Roush)",
+    "email": "jeremy@jeremedia.com",
+    "url": "https://github.com/jeremedia/unity-mcp"
+  },
+  "original-author": {
     "name": "Coplay",
     "email": "support@coplay.dev",
     "url": "https://coplay.dev"
