@@ -1055,6 +1055,7 @@ namespace MCPForUnity.Editor
                     "manage_shader" => ManageShader.HandleCommand(paramsObject),
                     "read_console" => ReadConsole.HandleCommand(paramsObject),
                     "manage_menu_item" => ManageMenuItem.HandleCommand(paramsObject),
+                    "invoke_component_method" => HandleInvokeComponentMethod(paramsObject),
                     _ => throw new ArgumentException(
                         $"Unknown or unsupported command type: {command.type}"
                     ),
@@ -1100,6 +1101,73 @@ namespace MCPForUnity.Editor
             catch (Exception ex)
             {
                 return Response.Error($"manage_scene dispatch error: {ex.Message}");
+            }
+        }
+
+        private static object HandleInvokeComponentMethod(JObject paramsObject)
+        {
+            try
+            {
+                if (IsDebugEnabled()) Debug.Log("[MCP] invoke_component_method: processing request");
+
+                // Extract parameters
+                var target = paramsObject["target"]?.ToString();
+                var searchMethod = paramsObject["search_method"]?.ToString() ?? "by_name";
+                var componentType = paramsObject["component_type"]?.ToString();
+                var methodName = paramsObject["method_name"]?.ToString();
+                var parameters = paramsObject["parameters"]?.ToObject<Dictionary<string, object>>();
+
+                if (string.IsNullOrEmpty(target) || string.IsNullOrEmpty(componentType) || string.IsNullOrEmpty(methodName))
+                {
+                    return Response.Error("Missing required parameters: target, component_type, and method_name are required");
+                }
+
+                // Find the GameObject
+                GameObject targetObject = null;
+                switch (searchMethod)
+                {
+                    case "by_name":
+                        targetObject = GameObject.Find(target);
+                        break;
+                    case "by_id":
+                        int instanceId;
+                        if (int.TryParse(target.Replace("\"", ""), out instanceId))
+                        {
+                            targetObject = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+                        }
+                        break;
+                    case "by_path":
+                        targetObject = GameObject.Find(target);
+                        break;
+                }
+
+                if (targetObject == null)
+                {
+                    return Response.Error($"Target GameObject '{target}' not found using method '{searchMethod}'");
+                }
+
+                // Invoke the method on main thread
+                var result = InvokeOnMainThreadWithTimeout(() =>
+                {
+                    return UnityMcp.Editor.Helpers.BuilderMethodInvoker.InvokeBuilderMethod(
+                        targetObject,
+                        componentType,
+                        methodName,
+                        parameters
+                    );
+                }, FrameIOTimeoutMs);
+
+                if (result == null)
+                {
+                    return Response.Error("Method invocation timed out");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[MCP] invoke_component_method error: {ex}");
+                return Response.Error($"Failed to invoke component method: {ex.Message}");
             }
         }
 
