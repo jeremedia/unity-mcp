@@ -10,6 +10,7 @@ from .read_console import register_read_console_tools
 from .manage_menu_item import register_manage_menu_item_tools
 from .resource_tools import register_resource_tools
 from .ce_builder_tools import register_ce_builder_tools
+from .invoke_builder_method import register_invoke_builder_method_tools
 
 logger = logging.getLogger("mcp-for-unity-server")
 
@@ -28,4 +29,5 @@ def register_all_tools(mcp):
     register_manage_menu_item_tools(mcp)
     register_resource_tools(mcp)
     register_ce_builder_tools(mcp)
+    register_invoke_builder_method_tools(mcp)
     logger.info("MCP for Unity Server tool registration complete.")
