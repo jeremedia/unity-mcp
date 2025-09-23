@@ -29,11 +29,14 @@ namespace UnityMcp.Editor.Helpers
                 throw new ArgumentNullException(nameof(target), "Target GameObject is null");
             }
 
-            // Get the component by type name
+            // Get the component by type name (support both simple name and full type name)
             Component component = null;
             foreach (var comp in target.GetComponents<Component>())
             {
-                if (comp != null && comp.GetType().Name == componentTypeName)
+                if (comp != null &&
+                    (comp.GetType().Name == componentTypeName ||
+                     comp.GetType().FullName == componentTypeName ||
+                     comp.GetType().ToString() == componentTypeName))
                 {
                     component = comp;
                     break;

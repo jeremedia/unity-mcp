@@ -127,11 +127,25 @@ def register_invoke_builder_method_tools(mcp: FastMCP):
                 }
 
             # Check if the component exists
-            components_data = component_response.get("data", {})
-            if component_type not in components_data:
+            components_data = component_response.get("data", [])
+            component_found = False
+
+            # components_data is an array of component info, check typeName field
+            for comp_info in components_data:
+                if isinstance(comp_info, dict):
+                    type_name = comp_info.get("typeName", "")
+                    # Check both simple name and full type name
+                    if (type_name == component_type or
+                        type_name.endswith(f".{component_type}") or
+                        component_type in type_name):
+                        component_found = True
+                        break
+
+            if not component_found:
+                available_types = [comp.get("typeName", "Unknown") for comp in components_data if isinstance(comp, dict)]
                 return {
                     "success": False,
-                    "error": f"Component '{component_type}' not found on GameObject '{target}'"
+                    "error": f"Component '{component_type}' not found on GameObject '{target}'. Available: {', '.join(available_types)}"
                 }
 
             # Invoke the method through Unity bridge
