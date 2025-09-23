@@ -1,6 +1,6 @@
 {
   "name": "com.curationengine.unity-mcp-ce",
-  "version": "3.4.0-ce.5",
+  "version": "3.4.0-ce.6",
   "displayName": "MCP for Unity - Curation Engine Edition",
   "description": "Unity MCP bridge enhanced for Curation Engine with Odin Inspector control surface extraction and natural language exhibition creation tools. Fork of CoplayDev/unity-mcp with CE-specific Builder support.\n\nBased on: https://github.com/CoplayDev/unity-mcp",
   "unity": "2021.3",
