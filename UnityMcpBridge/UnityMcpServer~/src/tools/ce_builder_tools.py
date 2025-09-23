@@ -5,519 +5,439 @@ Provides MCP tools for manipulating CE Builders and their control surfaces.
 These tools enable natural language curator commands to create exhibitions.
 """
 
+from mcp.server.fastmcp import FastMCP
 from typing import Dict, Any, List, Optional
-from ..bridge import Bridge
-from ..models.result import UnityResult
-import json
+from unity_connection import get_unity_connection, send_command_with_retry
+from telemetry_decorator import telemetry_tool
+import logging
+import re
+
+logger = logging.getLogger("mcp-for-unity-server")
 
 
-# Tool 1: Get Control Surface for a Builder
-async def get_builder_control_surface(
-    target: str,
-    search_method: str = "by_name"
-) -> UnityResult:
-    """
-    Extracts the control surface (Odin-attributed properties and methods) from a CE Builder.
+def register_ce_builder_tools(mcp: FastMCP):
+    """Register all CE Builder tools with the MCP server."""
 
-    Args:
-        target: GameObject name, path, or instance ID containing the Builder
-        search_method: How to find the GameObject ("by_name", "by_path", "by_id")
+    @mcp.tool()
+    @telemetry_tool("get_builder_control_surface")
+    def get_builder_control_surface(
+        ctx: Any,
+        target: str,
+        search_method: str = "by_name"
+    ) -> Dict[str, Any]:
+        """
+        Extracts the control surface (Odin-attributed properties and methods) from a CE Builder.
 
-    Returns:
-        Control surface data including properties, methods, and MCP tool definition
-    """
-    return await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "GetBuilderControlSurface",
-        {
-            "target": target,
-            "search_method": search_method
-        }
-    )
+        Args:
+            ctx: MCP context
+            target: GameObject name, path, or instance ID containing the Builder
+            search_method: How to find the GameObject ("by_name", "by_path", "by_id")
 
+        Returns:
+            Control surface data including properties, methods, and MCP tool definition
+        """
+        try:
+            params = {
+                "command": "GetBuilderControlSurface",
+                "target": target,
+                "searchMethod": search_method
+            }
 
-# Tool 2: Place a Room using preset
-async def place_room(
-    preset_name: Optional[str] = None,
-    width: float = 30.0,
-    length: float = 40.0,
-    height: float = 12.0,
-    wall_material: str = "white",
-    position: Optional[List[float]] = None,
-    **kwargs
-) -> UnityResult:
-    """
-    Places an exhibition room in the scene using CE's OK_Room_Builder.
+            response = send_command_with_retry("manage_gameobject", params)
 
-    Args:
-        preset_name: Optional preset to use from the Room preset database
-        width: Room width in feet (default 30)
-        length: Room length in feet (default 40)
-        height: Room height in feet (default 12)
-        wall_material: Wall material preset name (default "white")
-        position: World position [x, y, z] for the room
-        **kwargs: Additional Builder properties to set
+            if isinstance(response, dict) and response.get("success"):
+                return {
+                    "success": True,
+                    "message": "Control surface extracted successfully",
+                    "data": response.get("data")
+                }
+            return response if isinstance(response, dict) else {
+                "success": False,
+                "message": str(response)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error extracting control surface: {str(e)}"
+            }
 
-    Returns:
-        Created room GameObject with OK_Room_Builder configured
-    """
-    component_properties = {
-        "OK_Room_Builder": {
-            "roomWidth": width,
-            "roomLength": length,
-            "roomHeight": height,
-            "wallMaterialPreset": wall_material
-        }
-    }
+    @mcp.tool()
+    @telemetry_tool("place_room")
+    def place_room(
+        ctx: Any,
+        preset_name: Optional[str] = None,
+        width: float = 30.0,
+        length: float = 40.0,
+        height: float = 12.0,
+        wall_material: str = "white",
+        position: Optional[List[float]] = None
+    ) -> Dict[str, Any]:
+        """
+        Places an exhibition room in the scene using CE's OK_Room_Builder.
 
-    # Add any additional properties
-    component_properties["OK_Room_Builder"].update(kwargs)
+        Args:
+            ctx: MCP context
+            preset_name: Optional preset to use from the Room preset database
+            width: Room width in feet (default 30)
+            length: Room length in feet (default 40)
+            height: Room height in feet (default 12)
+            wall_material: Wall material preset name (default "white")
+            position: World position [x, y, z] for the room
 
-    # If preset specified, set it
-    if preset_name:
-        component_properties["OK_Room_Builder"]["selectedPreset"] = preset_name
+        Returns:
+            Created room GameObject with OK_Room_Builder configured
+        """
+        try:
+            # First create the GameObject with the Builder component
+            create_params = {
+                "action": "create",
+                "name": f"Room_{width}x{length}",
+                "componentsToAdd": ["OK_Room_Builder"],
+                "position": position or [0, 0, 0]
+            }
 
-    # Create the room GameObject with Builder
-    result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "CreateGameObject",
-        {
-            "name": f"Room_{width}x{length}",
-            "components": ["OK_Room_Builder"],
-            "component_properties": component_properties,
-            "position": position or [0, 0, 0]
-        }
-    )
+            create_response = send_command_with_retry("manage_gameobject", create_params)
 
-    # Trigger Draw() to manifest the room
-    if result.success and result.data:
-        instance_id = result.data.get("instanceID")
-        if instance_id:
-            await invoke_builder_method(
-                instance_id=instance_id,
-                method_name="Draw",
-                is_async=True
-            )
+            if not (isinstance(create_response, dict) and create_response.get("success")):
+                return create_response if isinstance(create_response, dict) else {
+                    "success": False,
+                    "message": f"Failed to create room: {str(create_response)}"
+                }
 
-    return result
+            # Now configure the Builder properties
+            instance_id = create_response.get("data", {}).get("instanceID")
+            if instance_id:
+                config_params = {
+                    "action": "set_component_property",
+                    "target": str(instance_id),
+                    "searchMethod": "by_id",
+                    "componentName": "OK_Room_Builder",
+                    "componentProperties": {
+                        "OK_Room_Builder": {
+                            "roomWidth": width,
+                            "roomLength": length,
+                            "roomHeight": height,
+                            "wallMaterialPreset": wall_material
+                        }
+                    }
+                }
 
+                if preset_name:
+                    config_params["componentProperties"]["OK_Room_Builder"]["selectedPreset"] = preset_name
 
-# Tool 3: Place a Floor Pedestal
-async def place_floor_pedestal(
-    preset_name: str = "StandardPedestal",
-    position: Optional[List[float]] = None,
-    rotation: float = 0,
-    scale: Optional[List[float]] = None,
-    **kwargs
-) -> UnityResult:
-    """
-    Places a floor pedestal for displaying artwork using CE's OK_Floor_Pedestal_Builder.
+                config_response = send_command_with_retry("manage_gameobject", config_params)
 
-    Args:
-        preset_name: Pedestal preset from the database
-        position: World position [x, y, z]
-        rotation: Y-axis rotation in degrees
-        scale: Scale factors [x, y, z]
-        **kwargs: Additional Builder properties
+                # Trigger Draw() to manifest the room
+                # Note: This might need a custom handler on Unity side
+                draw_params = {
+                    "action": "invoke_method",
+                    "target": str(instance_id),
+                    "searchMethod": "by_id",
+                    "componentName": "OK_Room_Builder",
+                    "methodName": "Draw"
+                }
 
-    Returns:
-        Created pedestal GameObject with OK_Floor_Pedestal_Builder configured
-    """
-    component_properties = {
-        "OK_Floor_Pedestal_Builder": {
-            "selectedPreset": preset_name
-        }
-    }
+                # Try to invoke Draw, but don't fail if it's not implemented yet
+                send_command_with_retry("manage_gameobject", draw_params)
 
-    component_properties["OK_Floor_Pedestal_Builder"].update(kwargs)
+            return {
+                "success": True,
+                "message": f"Room created successfully",
+                "data": create_response.get("data")
+            }
 
-    result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "CreateGameObject",
-        {
-            "name": f"Pedestal_{preset_name}",
-            "components": ["OK_Floor_Pedestal_Builder"],
-            "component_properties": component_properties,
-            "position": position or [0, 0, 0],
-            "rotation": [0, rotation, 0],
-            "scale": scale or [1, 1, 1]
-        }
-    )
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error placing room: {str(e)}"
+            }
 
-    # Trigger Draw() to manifest
-    if result.success and result.data:
-        instance_id = result.data.get("instanceID")
-        if instance_id:
-            await invoke_builder_method(
-                instance_id=instance_id,
-                method_name="Draw",
-                is_async=True
-            )
+    @mcp.tool()
+    @telemetry_tool("place_floor_pedestal")
+    def place_floor_pedestal(
+        ctx: Any,
+        preset_name: str = "StandardPedestal",
+        position: Optional[List[float]] = None,
+        rotation: float = 0,
+        scale: Optional[List[float]] = None
+    ) -> Dict[str, Any]:
+        """
+        Places a floor pedestal for displaying artwork using CE's OK_Floor_Pedestal_Builder.
 
-    return result
+        Args:
+            ctx: MCP context
+            preset_name: Pedestal preset from the database
+            position: World position [x, y, z]
+            rotation: Y-axis rotation in degrees
+            scale: Scale factors [x, y, z]
 
+        Returns:
+            Created pedestal GameObject with OK_Floor_Pedestal_Builder configured
+        """
+        try:
+            create_params = {
+                "action": "create",
+                "name": f"Pedestal_{preset_name}",
+                "componentsToAdd": ["OK_Floor_Pedestal_Builder"],
+                "position": position or [0, 0, 0],
+                "rotation": [0, rotation, 0],
+                "scale": scale or [1, 1, 1]
+            }
 
-# Tool 4: Mount Artwork on Wall
-async def mount_artwork(
-    wall_target: str,
-    artwork_preset: str,
-    position_x: float = 0.5,
-    position_y: float = 0.5,
-    frame_preset: Optional[str] = None,
-    **kwargs
-) -> UnityResult:
-    """
-    Mounts artwork on a wall using CE's frame and print system.
+            create_response = send_command_with_retry("manage_gameobject", create_params)
 
-    Args:
-        wall_target: Wall GameObject name or path
-        artwork_preset: Artwork/print preset name
-        position_x: Normalized position on wall width (0-1)
-        position_y: Normalized position on wall height (0-1)
-        frame_preset: Optional frame preset name
-        **kwargs: Additional frame/print properties
+            if not (isinstance(create_response, dict) and create_response.get("success")):
+                return create_response if isinstance(create_response, dict) else {
+                    "success": False,
+                    "message": f"Failed to create pedestal: {str(create_response)}"
+                }
 
-    Returns:
-        Created artwork GameObject mounted on the wall
-    """
-    # First find the wall
-    wall_result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "FindGameObject",
-        {
-            "search_term": wall_target,
-            "search_method": "by_name"
-        }
-    )
+            # Configure the pedestal with the preset
+            instance_id = create_response.get("data", {}).get("instanceID")
+            if instance_id:
+                config_params = {
+                    "action": "set_component_property",
+                    "target": str(instance_id),
+                    "searchMethod": "by_id",
+                    "componentName": "OK_Floor_Pedestal_Builder",
+                    "componentProperties": {
+                        "OK_Floor_Pedestal_Builder": {
+                            "selectedPreset": preset_name
+                        }
+                    }
+                }
 
-    if not wall_result.success:
-        return wall_result
+                send_command_with_retry("manage_gameobject", config_params)
 
-    wall_id = wall_result.data.get("instanceID")
+                # Try to invoke Draw
+                draw_params = {
+                    "action": "invoke_method",
+                    "target": str(instance_id),
+                    "searchMethod": "by_id",
+                    "componentName": "OK_Floor_Pedestal_Builder",
+                    "methodName": "Draw"
+                }
 
-    # Create frame layout on the wall
-    result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "CreateGameObject",
-        {
-            "name": f"Artwork_{artwork_preset}",
-            "parent_id": wall_id,
-            "components": ["OK_Frame_Layout_Builder", "OK_Framed_Print_Builder"],
-            "component_properties": {
-                "OK_Frame_Layout_Builder": {
-                    "normalizedX": position_x,
-                    "normalizedY": position_y,
-                    "framePreset": frame_preset
-                },
-                "OK_Framed_Print_Builder": {
-                    "printPreset": artwork_preset,
-                    **kwargs
+                send_command_with_retry("manage_gameobject", draw_params)
+
+            return {
+                "success": True,
+                "message": f"Pedestal placed successfully",
+                "data": create_response.get("data")
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error placing pedestal: {str(e)}"
+            }
+
+    @mcp.tool()
+    @telemetry_tool("configure_lighting")
+    def configure_lighting(
+        ctx: Any,
+        room_target: str,
+        lighting_preset: str = "GalleryTrack",
+        intensity: float = 1.0,
+        color_temperature: float = 5600
+    ) -> Dict[str, Any]:
+        """
+        Configures room lighting using CE's OK_Room_Light_Builder.
+
+        Args:
+            ctx: MCP context
+            room_target: Room GameObject name or path
+            lighting_preset: Lighting configuration preset
+            intensity: Light intensity multiplier
+            color_temperature: Color temperature in Kelvin
+
+        Returns:
+            Updated room lighting configuration
+        """
+        try:
+            # Find the room GameObject
+            find_params = {
+                "action": "find",
+                "searchTerm": room_target,
+                "searchMethod": "by_name"
+            }
+
+            find_response = send_command_with_retry("manage_gameobject", find_params)
+
+            if not (isinstance(find_response, dict) and find_response.get("success")):
+                return {
+                    "success": False,
+                    "message": f"Could not find room: {room_target}"
+                }
+
+            room_data = find_response.get("data", [])
+            if not room_data or (isinstance(room_data, list) and len(room_data) == 0):
+                return {
+                    "success": False,
+                    "message": f"Room not found: {room_target}"
+                }
+
+            room_id = room_data[0].get("instanceID") if isinstance(room_data, list) else room_data.get("instanceID")
+
+            # Add or configure the Room Light Builder
+            light_params = {
+                "action": "add_component",
+                "target": str(room_id),
+                "searchMethod": "by_id",
+                "componentsToAdd": ["OK_Room_Light_Builder"]
+            }
+
+            send_command_with_retry("manage_gameobject", light_params)
+
+            # Configure the lighting
+            config_params = {
+                "action": "set_component_property",
+                "target": str(room_id),
+                "searchMethod": "by_id",
+                "componentName": "OK_Room_Light_Builder",
+                "componentProperties": {
+                    "OK_Room_Light_Builder": {
+                        "lightingPreset": lighting_preset,
+                        "intensity": intensity,
+                        "colorTemperature": color_temperature
+                    }
                 }
             }
-        }
-    )
 
-    # Trigger Draw() on both builders
-    if result.success and result.data:
-        instance_id = result.data.get("instanceID")
-        if instance_id:
-            await invoke_builder_method(
-                instance_id=instance_id,
-                method_name="Draw",
-                is_async=True,
-                component_name="OK_Frame_Layout_Builder"
-            )
-            await invoke_builder_method(
-                instance_id=instance_id,
-                method_name="Draw",
-                is_async=True,
-                component_name="OK_Framed_Print_Builder"
-            )
+            config_response = send_command_with_retry("manage_gameobject", config_params)
 
-    return result
-
-
-# Tool 5: Configure Lighting
-async def configure_lighting(
-    room_target: str,
-    lighting_preset: str = "GalleryTrack",
-    intensity: float = 1.0,
-    color_temperature: float = 5600,
-    **kwargs
-) -> UnityResult:
-    """
-    Configures room lighting using CE's OK_Room_Light_Builder.
-
-    Args:
-        room_target: Room GameObject name or path
-        lighting_preset: Lighting configuration preset
-        intensity: Light intensity multiplier
-        color_temperature: Color temperature in Kelvin
-        **kwargs: Additional lighting properties
-
-    Returns:
-        Updated room lighting configuration
-    """
-    # Find the room
-    room_result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "FindGameObject",
-        {
-            "search_term": room_target,
-            "search_method": "by_name"
-        }
-    )
-
-    if not room_result.success:
-        return room_result
-
-    room_id = room_result.data.get("instanceID")
-
-    # Add or update Room Light Builder
-    result = await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "UpdateComponent",
-        {
-            "target_id": room_id,
-            "component_name": "OK_Room_Light_Builder",
-            "properties": {
-                "lightingPreset": lighting_preset,
-                "intensity": intensity,
-                "colorTemperature": color_temperature,
-                **kwargs
+            return {
+                "success": True,
+                "message": f"Lighting configured successfully",
+                "data": config_response.get("data") if isinstance(config_response, dict) else None
             }
-        }
-    )
 
-    # Trigger Draw() to update lighting
-    if result.success:
-        await invoke_builder_method(
-            instance_id=room_id,
-            method_name="Draw",
-            is_async=True,
-            component_name="OK_Room_Light_Builder"
-        )
-
-    return result
-
-
-# Tool 6: Create Exhibition Space from Description
-async def create_exhibition_space(
-    description: str,
-    use_ai_parsing: bool = True
-) -> UnityResult:
-    """
-    Creates a complete exhibition space from a natural language description.
-    This is the main curator interface for creating spaces.
-
-    Args:
-        description: Natural language description of the desired exhibition space
-        use_ai_parsing: Whether to use AI to parse the description (future feature)
-
-    Returns:
-        Created exhibition space with all components
-
-    Example:
-        "Create a 30x40 foot gallery with white walls, track lighting, and three pedestals"
-    """
-    # For now, use simple parsing - in future, integrate with LLM
-    parsed = parse_exhibition_description(description)
-
-    results = {
-        "room": None,
-        "pedestals": [],
-        "lighting": None
-    }
-
-    # Create the room
-    if parsed.get("room"):
-        room_params = parsed["room"]
-        room_result = await place_room(**room_params)
-        results["room"] = room_result.data if room_result.success else None
-
-    # Add pedestals
-    for pedestal_params in parsed.get("pedestals", []):
-        pedestal_result = await place_floor_pedestal(**pedestal_params)
-        if pedestal_result.success:
-            results["pedestals"].append(pedestal_result.data)
-
-    # Configure lighting
-    if parsed.get("lighting") and results["room"]:
-        lighting_params = parsed["lighting"]
-        lighting_params["room_target"] = results["room"]["name"]
-        lighting_result = await configure_lighting(**lighting_params)
-        results["lighting"] = lighting_result.data if lighting_result.success else None
-
-    return UnityResult(
-        success=True,
-        data=results,
-        message=f"Created exhibition space from description"
-    )
-
-
-# Tool 7: Invoke Builder Method
-async def invoke_builder_method(
-    instance_id: int,
-    method_name: str,
-    component_name: str = None,
-    is_async: bool = False,
-    parameters: Optional[Dict[str, Any]] = None
-) -> UnityResult:
-    """
-    Invokes a method on a CE Builder component.
-
-    Args:
-        instance_id: GameObject instance ID
-        method_name: Method name to invoke (e.g., "Draw", "Erase")
-        component_name: Specific component name if multiple Builders
-        is_async: Whether the method is async (UniTask)
-        parameters: Optional method parameters
-
-    Returns:
-        Method execution result
-    """
-    return await Bridge.call_unity_method(
-        "ManageGameObjectHandler",
-        "InvokeComponentMethod",
-        {
-            "instance_id": instance_id,
-            "component_name": component_name,
-            "method_name": method_name,
-            "is_async": is_async,
-            "parameters": parameters or {}
-        }
-    )
-
-
-# Helper function to parse exhibition descriptions
-def parse_exhibition_description(description: str) -> Dict[str, Any]:
-    """
-    Simple parser for exhibition descriptions.
-    In production, this would use an LLM for better parsing.
-    """
-    description_lower = description.lower()
-
-    parsed = {}
-
-    # Parse room dimensions
-    if "room" in description_lower or "gallery" in description_lower or "space" in description_lower:
-        room_params = {"preset_name": None}
-
-        # Look for dimensions (e.g., "30x40")
-        import re
-        dim_pattern = r'(\d+)\s*x\s*(\d+)'
-        dim_match = re.search(dim_pattern, description)
-        if dim_match:
-            room_params["width"] = float(dim_match.group(1))
-            room_params["length"] = float(dim_match.group(2))
-
-        # Look for height
-        height_pattern = r'(\d+)\s*(?:foot|feet|ft)?\s*(?:tall|high|height)'
-        height_match = re.search(height_pattern, description_lower)
-        if height_match:
-            room_params["height"] = float(height_match.group(1))
-
-        # Look for wall color
-        if "white" in description_lower:
-            room_params["wall_material"] = "white"
-        elif "black" in description_lower:
-            room_params["wall_material"] = "black"
-        elif "gray" in description_lower or "grey" in description_lower:
-            room_params["wall_material"] = "gray"
-
-        parsed["room"] = room_params
-
-    # Parse pedestals
-    if "pedestal" in description_lower:
-        pedestal_count = 1
-
-        # Look for count
-        count_patterns = [
-            r'(\d+)\s+pedestals?',
-            r'(one|two|three|four|five)\s+pedestals?'
-        ]
-
-        number_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
-
-        for pattern in count_patterns:
-            match = re.search(pattern, description_lower)
-            if match:
-                count_str = match.group(1)
-                if count_str.isdigit():
-                    pedestal_count = int(count_str)
-                elif count_str in number_words:
-                    pedestal_count = number_words[count_str]
-                break
-
-        # Create pedestals with distributed positions
-        pedestals = []
-        for i in range(pedestal_count):
-            # Simple grid layout
-            x_pos = (i % 3 - 1) * 10  # -10, 0, 10
-            z_pos = (i // 3) * 10
-
-            pedestals.append({
-                "preset_name": "StandardPedestal",
-                "position": [x_pos, 0, z_pos]
-            })
-
-        parsed["pedestals"] = pedestals
-
-    # Parse lighting
-    if "lighting" in description_lower or "light" in description_lower:
-        lighting_params = {}
-
-        if "track" in description_lower:
-            lighting_params["lighting_preset"] = "GalleryTrack"
-        elif "spot" in description_lower:
-            lighting_params["lighting_preset"] = "Spotlight"
-        elif "ambient" in description_lower:
-            lighting_params["lighting_preset"] = "Ambient"
-        else:
-            lighting_params["lighting_preset"] = "GalleryTrack"
-
-        # Look for intensity
-        if "bright" in description_lower:
-            lighting_params["intensity"] = 1.5
-        elif "dim" in description_lower:
-            lighting_params["intensity"] = 0.5
-        else:
-            lighting_params["intensity"] = 1.0
-
-        parsed["lighting"] = lighting_params
-
-    return parsed
-
-
-# Register all tools when module is imported
-def register_ce_builder_tools(mcp):
-    """Register all CE Builder tools with the MCP server."""
-    import logging
-    logger = logging.getLogger("mcp-for-unity-server")
-
-    tools = [
-        ("get_builder_control_surface", get_builder_control_surface,
-         "Extract control surface from CE Builder"),
-        ("place_room", place_room,
-         "Place an exhibition room using CE's OK_Room_Builder"),
-        ("place_floor_pedestal", place_floor_pedestal,
-         "Place a floor pedestal using CE's OK_Floor_Pedestal_Builder"),
-        ("mount_artwork", mount_artwork,
-         "Mount artwork on a wall using CE's frame system"),
-        ("configure_lighting", configure_lighting,
-         "Configure room lighting using CE's OK_Room_Light_Builder"),
-        ("create_exhibition_space", create_exhibition_space,
-         "Create complete exhibition from natural language description"),
-        ("invoke_builder_method", invoke_builder_method,
-         "Invoke a method on a CE Builder component")
-    ]
-
-    for name, func, description in tools:
-        try:
-            # Register with MCP following the existing pattern
-            mcp.tool(name=name, description=description)(func)
-            logger.info(f"Registered CE Builder tool: {name}")
         except Exception as e:
-            logger.error(f"Failed to register CE Builder tool {name}: {e}")
+            return {
+                "success": False,
+                "message": f"Error configuring lighting: {str(e)}"
+            }
 
-    logger.info(f"Registered {len(tools)} CE Builder tools successfully")
+    @mcp.tool()
+    @telemetry_tool("create_exhibition_space")
+    def create_exhibition_space(
+        ctx: Any,
+        description: str
+    ) -> Dict[str, Any]:
+        """
+        Creates a complete exhibition space from a natural language description.
+        This is the main curator interface for creating spaces.
+
+        Args:
+            ctx: MCP context
+            description: Natural language description of the desired exhibition space
+
+        Returns:
+            Created exhibition space with all components
+
+        Example:
+            "Create a 30x40 foot gallery with white walls, track lighting, and three pedestals"
+        """
+        try:
+            # Simple parsing of the description
+            # In a production system, this would use an LLM
+            description_lower = description.lower()
+
+            results = {
+                "room": None,
+                "pedestals": [],
+                "lighting": None
+            }
+
+            # Parse and create room if mentioned
+            if "room" in description_lower or "gallery" in description_lower or "space" in description_lower:
+                # Extract dimensions if present
+                dim_pattern = r'(\d+)\s*x\s*(\d+)'
+                dim_match = re.search(dim_pattern, description)
+
+                width = float(dim_match.group(1)) if dim_match else 30.0
+                length = float(dim_match.group(2)) if dim_match else 40.0
+
+                # Determine wall color
+                wall_material = "white"  # default
+                if "black" in description_lower:
+                    wall_material = "black"
+                elif "gray" in description_lower or "grey" in description_lower:
+                    wall_material = "gray"
+
+                room_response = place_room(
+                    ctx,
+                    width=width,
+                    length=length,
+                    wall_material=wall_material
+                )
+
+                if room_response.get("success"):
+                    results["room"] = room_response.get("data")
+
+            # Parse and create pedestals if mentioned
+            if "pedestal" in description_lower:
+                # Look for count
+                count_match = re.search(r'(\d+)\s+pedestals?', description_lower)
+                pedestal_count = int(count_match.group(1)) if count_match else 1
+
+                # Handle word numbers
+                word_numbers = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+                for word, num in word_numbers.items():
+                    if word in description_lower and "pedestal" in description_lower:
+                        pedestal_count = num
+                        break
+
+                # Create pedestals
+                for i in range(pedestal_count):
+                    x_pos = (i % 3 - 1) * 10  # Simple grid layout
+                    z_pos = (i // 3) * 10
+
+                    pedestal_response = place_floor_pedestal(
+                        ctx,
+                        position=[x_pos, 0, z_pos]
+                    )
+
+                    if pedestal_response.get("success"):
+                        results["pedestals"].append(pedestal_response.get("data"))
+
+            # Configure lighting if room was created
+            if results["room"] and ("lighting" in description_lower or "light" in description_lower):
+                room_name = results["room"].get("name")
+
+                lighting_preset = "GalleryTrack"  # default
+                if "spot" in description_lower:
+                    lighting_preset = "Spotlight"
+                elif "ambient" in description_lower:
+                    lighting_preset = "Ambient"
+
+                intensity = 1.0
+                if "bright" in description_lower:
+                    intensity = 1.5
+                elif "dim" in description_lower:
+                    intensity = 0.5
+
+                if room_name:
+                    lighting_response = configure_lighting(
+                        ctx,
+                        room_target=room_name,
+                        lighting_preset=lighting_preset,
+                        intensity=intensity
+                    )
+
+                    if lighting_response.get("success"):
+                        results["lighting"] = lighting_response.get("data")
+
+            return {
+                "success": True,
+                "message": f"Created exhibition space from description",
+                "data": results
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error creating exhibition space: {str(e)}"
+            }
+
+    logger.info("CE Builder tools registered successfully")
