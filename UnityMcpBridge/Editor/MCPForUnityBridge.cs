@@ -1149,7 +1149,7 @@ namespace MCPForUnity.Editor
                 // Invoke the method on main thread
                 var result = InvokeOnMainThreadWithTimeout(() =>
                 {
-                    return UnityMcp.Editor.Helpers.BuilderMethodInvoker.InvokeBuilderMethod(
+                    return BuilderMethodInvoker.InvokeBuilderMethod(
                         targetObject,
                         componentType,
                         methodName,

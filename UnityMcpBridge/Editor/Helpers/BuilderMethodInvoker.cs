@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace UnityMcp.Editor.Helpers
+namespace MCPForUnity.Editor.Helpers
 {
     /// <summary>
     /// Helper class for invoking methods on Unity Builder components via MCP.
