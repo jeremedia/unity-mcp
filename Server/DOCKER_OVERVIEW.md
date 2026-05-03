@@ -1,5 +1,7 @@
 # MCP for Unity Server (Docker Image)
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 [![MCP](https://badge.mcpx.dev?status=on 'MCP Enabled')](https://modelcontextprotocol.io/introduction)
 [![License](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 [![Discord](https://img.shields.io/badge/discord-join-red.svg?logo=discord&logoColor=white)](https://discord.gg/y4p8KfzrN4)

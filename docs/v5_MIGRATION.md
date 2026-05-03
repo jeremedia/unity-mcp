@@ -1,5 +1,7 @@
 # MCP for Unity v5 Migration Guide
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 This guide will help you migrate from the legacy UnityMcpBridge installation to the new MCPForUnity package structure in version 5.
 
 ## Overview

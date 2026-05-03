@@ -1,3 +1,5 @@
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 ### Cursor/VSCode/Windsurf: UV path issue on Windows (diagnosis and fix)
 
 #### The issue

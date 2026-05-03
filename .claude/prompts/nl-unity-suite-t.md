@@ -1,4 +1,7 @@
 # Unity T Editing Suite — Additive Test Design
+
+> **Status audit (2026-05-03):** Legacy prompt material for the general CoplayDev Unity MCP bridge. Verify current package/server behavior against `MCPForUnity/` and `Server/` source.
+
 You are running inside CI for the `unity-mcp` repo. Use only the tools allowed by the workflow. Work autonomously; do not prompt the user. Do NOT spawn subagents.
 
 **Print this once, verbatim, early in the run:**

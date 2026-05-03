@@ -1,5 +1,7 @@
 # MCP for Unity Telemetry
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 MCP for Unity includes privacy-focused, anonymous telemetry to help us improve the product. This document explains what data is collected, how to opt out, and our privacy practices.
 
 ## 🔒 Privacy First

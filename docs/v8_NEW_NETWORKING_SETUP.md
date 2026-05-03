@@ -4,6 +4,9 @@ author: Marcus Sanatan <marcus@coplay.dev>
 date: 2025-11-15
 ---
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
+
 # HTTP and Stdio Support
 
 This project has 3 components:

@@ -1,3 +1,5 @@
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 <img width="676" height="380" alt="MCP for Unity" src="docs/images/logo.png" />
 
 | [English](README.md) | [简体中文](README-zh.md) |
@@ -150,7 +152,7 @@ MCP for Unity 使用两个组件连接您的工具：
 
 **需要锁定版本？** 使用带标签的 URL（更新时需卸载并重新安装）：
 ```
-https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.0.0
+https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.7.0
 ```
 
 #### 通过 OpenUPM 安装
@@ -166,8 +168,8 @@ https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.0.0
 HTTP 传输默认启用。Unity 窗口可以为您启动 FastMCP 服务器：
 
 1. 打开 `Window > MCP for Unity`。
-2. 确保**传输**下拉菜单设置为 `HTTP`（默认），并且 **HTTP URL** 是您想要的（默认为 `http://localhost:8080`）。
-3. 点击**启动本地 HTTP 服务器**。Unity 会生成一个新的操作系统终端，运行 `uv ... server.py --transport http`。
+2. 确保**传输**下拉菜单设置为 `HTTP Local`（默认），并且 **HTTP URL** 是您想要的（默认为 `http://localhost:8080`）。
+3. 点击 **Start Server**。Unity 会生成一个新的操作系统终端，运行 `uv ... server.py --transport http`。
 4. 在您工作时保持该终端窗口打开；关闭它会停止服务器。如果您需要干净地关闭它，请使用 Unity 窗口中的**停止会话**按钮。
 
 > 更喜欢 stdio？将传输下拉菜单更改为 `Stdio`，Unity 将回退到嵌入式 TCP 桥接器，而不是启动 HTTP 服务器。
@@ -177,7 +179,7 @@ HTTP 传输默认启用。Unity 窗口可以为您启动 FastMCP 服务器：
 您也可以从终端自己启动服务器——对 CI 或当您想查看原始日志时很有用：
 
 ```bash
-uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.1.0#subdirectory=Server" mcp-for-unity --transport http --http-url http://localhost:8080
+uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server" mcp-for-unity --transport http --http-url http://localhost:8080
 ```
 
 在客户端连接时保持进程运行。

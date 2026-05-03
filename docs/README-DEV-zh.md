@@ -1,5 +1,7 @@
 # MCP for Unity 开发工具
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 | [English](README-DEV.md) | [简体中文](README-DEV-zh.md) |
 |---------------------------|------------------------------|
 

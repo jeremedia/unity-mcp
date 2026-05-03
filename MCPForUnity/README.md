@@ -1,5 +1,7 @@
 # MCP for Unity — Editor Plugin Guide
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 Use this guide to configure and run MCP for Unity inside the Unity Editor. Installation is covered elsewhere; this document focuses on the Editor window, client configuration, and troubleshooting.
 
 ## Open the window

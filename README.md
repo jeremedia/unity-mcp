@@ -1,3 +1,5 @@
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 <img width="676" height="380" alt="MCP for Unity" src="docs/images/logo.png" />
 
 | [English](README.md) | [简体中文](README-zh.md) |
@@ -154,7 +156,7 @@ MCP for Unity connects your tools using two components:
 
 **Need a stable/fixed version?** Use a tagged URL instead (updates require uninstalling and re-installing):
 ```
-https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.6.0
+https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.7.0
 ```
 
 #### To install via OpenUPM
@@ -181,7 +183,7 @@ HTTP transport is enabled out of the box. The Unity window can launch the FastMC
 You can also start the server yourself from a terminal—useful for CI or when you want to see raw logs:
 
 ```bash
-uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.6.0#subdirectory=Server" mcp-for-unity --transport http --http-url http://localhost:8080
+uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server" mcp-for-unity --transport http --http-url http://localhost:8080
 ```
 
 Keep the process running while clients are connected.

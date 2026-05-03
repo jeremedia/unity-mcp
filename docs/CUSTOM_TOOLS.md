@@ -1,5 +1,7 @@
 # Adding Custom Tools to MCP for Unity
 
+> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+
 MCP for Unity makes it easy to extend your AI assistant with custom capabilities. Using C# attributes and reflection, the system automatically discovers and registers your tools—no manual configuration needed.
 
 This guide will walk you through creating your own tools, from simple synchronous operations to complex long-running tasks that survive Unity's domain reloads.
