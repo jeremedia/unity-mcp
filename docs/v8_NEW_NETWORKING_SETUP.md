@@ -4,7 +4,10 @@ author: Marcus Sanatan <marcus@coplay.dev>
 date: 2025-11-15
 ---
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** Historical v8 networking design note,
+> source-refreshed for the current backend entry point and transport names. Use
+> it for architecture context, not as CE-specific control-surface authority or
+> runtime proof.
 
 
 # HTTP and Stdio Support
@@ -46,7 +49,7 @@ In this new version of MCP for Unity, our MCP server supports both the stdio and
 
 ### HTTP Architecture
 
-We create MCP configs that reference a URL, by default http://localhost:8080, however, users can change it to any address. MCP clients connect to the running HTTP server, and communicate with the MCP server via HTTP POST requests with JSON. Unlike in stdio, the MCP server is not a subprocess of the client, but is run independently of all other components.
+The Unity window stores a base URL, by default `http://localhost:8080`, but generated MCP client configs use the JSON-RPC endpoint with `/mcp` appended (for example, `http://localhost:8080/mcp`). MCP clients connect to that running HTTP server endpoint and communicate with the MCP server via HTTP POST requests with JSON. Unlike in stdio, the MCP server is not a subprocess of the client, but is run independently of all other components.
 
 What about the MCP server and Unity? We could maintain the communication channel that's used in stdio i.e. communicating via port 6400. However, this would limit the HTTP server to only being run locally. A remote HTTP server would not have access to a user's port 6400 (unless users open their ports to the internet, which may be hard for some and is an unnecessary security risk).
 
@@ -84,7 +87,14 @@ Significant changes were made to the server and Unity plugin to support the HTTP
 
 ### Server
 
-`server.py` is still the main entrypoint for the backend, but now it's been modified to setup both HTTP and stdio connections. It processes command line arguments or environment variables for the HTTP mode. CLI args take precedence over the environment variables. The following code runs the server:
+`Server/src/main.py` is the current backend entrypoint for the local source
+checkout, and the packaged console script is `mcp-for-unity`. It sets up both
+HTTP and stdio connections and processes command line arguments or environment
+variables for the HTTP mode. Current precedence is mixed: `--transport`
+defaults to `stdio`, so use `--transport http` instead of relying on
+`UNITY_MCP_TRANSPORT=http`; `UNITY_MCP_HTTP_URL` can override `--http-url`,
+while explicit `--http-host` and `--http-port` override their environment
+variables. The following code runs the server:
 
 ```python
 mcp.run(transport=transport, host=host, port=port)
@@ -92,17 +102,17 @@ mcp.run(transport=transport, host=host, port=port)
 
 And that's pretty much it in terms of HTTP support between the MCP server and client. Things get more interesting for the connection to the Unity plugin.
 
-Backward compatability with stdio connections was maintained, but we did make some small performance optimisations. Namely, we have an in-memory cache of unity isntances using the `StdioPortRegistry` class.
+Backward compatibility with stdio connections was maintained, but we did make some small performance optimizations. Namely, we have an in-memory cache of Unity instances using the `StdioPortRegistry` class.
 
 It still calls `PortDiscovery.discover_all_unity_instances()`, but we add a lock when calling it, so multiple attempts to retrieve the instances do not cause our app to run multiple file scans at the same time. 
 
-The `UnityConnection` class uses the cached ports to retrieve the open port for a specific instances when creating a new connection, and when sending a command.
+The `UnityConnection` class uses the cached ports to retrieve the open port for a specific instance when creating a new connection and when sending a command.
 
 For WebSocket connections, we need to understand the `PluginHub` and the `PluginRegistry` classes. The plugin hub is what manages the WebSocket connections with the MCP server in-memory. It also has the `send_command_for_instance` function, which actually sends the command to the Unity plugin.
 
-The in-memory mapping of sessions to WebSockets connections in the plugin hub is done via the `PluginRegistry` class.
+The in-memory mapping of sessions to WebSocket connections in the plugin hub is done via the `PluginRegistry` class.
 
-You're wondering if every function tool needs to use the `send_command_for_instance` and the current function and choose between WebSockets/stdio every invocation? No, to keep tool calls as simple as posisble, all users have to do is call the `send_with_unity_instance`, which delegates the actual sending of data to `send_command_for_instance` or `send_fn`, which is a function that's parsed to the arguments of `send_with_unity_instance`, typically `async_send_command_with_retry`.
+You're wondering if every function tool needs to use `send_command_for_instance`, inspect the current function, and choose between WebSocket/stdio every invocation? No, to keep tool calls as simple as possible, users call `send_with_unity_instance`, which delegates the actual sending of data to `send_command_for_instance` or `send_fn`; `send_fn` is passed as an argument to `send_with_unity_instance`, typically `async_send_command_with_retry`.
 
 ### Unity Plugin
 
@@ -163,7 +173,7 @@ Relevant commits:
 
 ### Asynchronous tools and resources
 
-Previously we had `async_send_with_unity_instance` and `send_with_unity_instance` functions to communicate with the Unity. Now, we only have `send_with_unity_instance`, and it's asynchronous. 
+Previously we had `async_send_with_unity_instance` and `send_with_unity_instance` functions to communicate with Unity. Now, we only have `send_with_unity_instance`, and it's asynchronous.
 
 This was required for the HTTP server, because we cannot block the event loop with synchronous commands. This change does not affect how the server works when using stdio.
 
@@ -177,7 +187,7 @@ Relevant commits:
 
 Custom tools were revamped once more, this time they're reached the simplest version that we wanted them to have - custom tools are written entirely in C# - no Python required. How does it work?
 
-Like before, we do reflection on the `McpForUnityToolAttribute`. However, this time the attribute now accepts a `name`, `description`, and `AutoRegister`. The `AutoRegister` boolean is true by default, but for our core tools it's false, as they don't have their tool details nor parameters defined in C# as yet.
+Like before, we do reflection on the `McpForUnityToolAttribute`. However, this time the attribute now accepts `Name`, `Description`, `StructuredOutput`, `AutoRegister`, `RequiresPolling`, and `PollAction`. `AutoRegister` is true by default, but for our core tools it's false, as they don't have their tool details nor parameters defined in C# as yet. `StructuredOutput` is true by default, `RequiresPolling` is false by default, and `PollAction` defaults to `status`; WebSocket registration sends these as `structured_output`, `requires_polling`, and `poll_action`.
 
 Parameters are defined using the `ToolParameterAttribute`, which contains `Name`, `Description`, `Required`, and `DefaultValue` properties. 
 
@@ -187,7 +197,7 @@ When we initiate a websocket connection, after successfully registering and retr
 
 In the `plugin_hub`'s `on_receive` handler, we look out for the `register_tools` message type, and map the tools to the session ID. This is important, we only want custom tools to be available for the project they've been added to.
 
-That requirement of keeping tools local to the projeect made this implementation a bit trickier. We have the requirement because in this project, we can run multiple Unity instances at the same time. So it doesn't make sense to make every tool globally available to all connected projects.
+That requirement of keeping tools local to the project made this implementation a bit trickier. We have the requirement because in this project, we can run multiple Unity instances at the same time. So it doesn't make sense to make every tool globally available to all connected projects.
 
 To make tools local to the project, we add a `unity://custom-tools` resource which lists all tools mapped to a session (which is retrieve from FastMCP's context). And then we add a `execute_custom_tool` function tool which can call the tools the user added. This worked surprisingly well, but required some tweaks:
 
@@ -255,7 +265,7 @@ This was a big change, and it touches all the repo. So a lot of inefficiencies a
 
 - Loose types in Python. A lot of the new code would use dictionaries for structured data, which works, but we can benefit much more from using Pydantic classes with proper type checking. We always want to know when data is not being transferred in the format we expect it to. Plus, strong types make the code easier for humans and LLMs to reason about.
 - A lot of tools define a `_coerce_int` function, why? Why are we redefining a function that's the same across files? Can we use a shared function, or maybe use it as middleware?
-- Similarly, the `DummyMCP` class is defined in 10 server tests, we could set this up in `conftest.py`. These tests were originally indepdendent of the `Server` project, but in v7 they became integration tests we run with `pytest`. With `pytest` being the default test runner, we can relook at how the tests are structured and optimize their setup.
+- Similarly, the `DummyMCP` class is defined in 10 server tests, we could set this up in `conftest.py`. These tests were originally independent of the `Server` project, but in v7 they became integration tests we run with `pytest`. With `pytest` being the default test runner, we can revisit how the tests are structured and optimize their setup.
 - `server_version.txt` is used in one place, but the server can now read its own pyproject.toml to get the version, so we can remove this.
 - ~~Think about a structure of the MCP server some more. The `tools`, `resources` and `registry` folders make sense, but everything else just forms part of the high level repo. It's growing, so some thought about how we create modules will help with scalability.~~
   - This was done, Server folder is much more hierarchical and structured.

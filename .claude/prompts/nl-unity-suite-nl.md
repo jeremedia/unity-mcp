@@ -1,6 +1,10 @@
 # Unity NL Editing Suite — Additive Test Design
 
-> **Status audit (2026-05-03):** Legacy prompt material for the general CoplayDev Unity MCP bridge. Verify current package/server behavior against `MCPForUnity/` and `Server/` source.
+> **Status audit (2026-06-20):** Legacy CI prompt material for the general
+> CoplayDev Unity MCP bridge. Source-rechecked for current package/server tool
+> names (`apply_text_edits`, `script_apply_edits`, `validate_script`,
+> `find_in_file`, `read_console`, `get_sha`), but this prompt is not
+> CE-specific control-surface authority and no Unity CI run was performed.
 
 You are running inside CI for the `unity-mcp` repo. Use only the tools allowed by the workflow. Work autonomously; do not prompt the user. Do NOT spawn subagents.
 
@@ -201,4 +205,3 @@ BAN ON EXTRA TOOLS AND DIRS
 - Do not use any tools outside `AllowedTools`. Do not create directories; assume `reports/` exists.
 
 ---
-

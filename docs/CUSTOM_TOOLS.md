@@ -1,6 +1,12 @@
 # Adding Custom Tools to MCP for Unity
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> CE-specific control-surface authority. Source-rechecked against
+> `MCPForUnity/Editor/Tools/McpForUnityToolAttribute.cs`,
+> `ToolDiscoveryService`, `CommandRegistry`, the WebSocket custom-tool
+> registration path, and `Server/src/services/tools/execute_custom_tool.py`.
+> Python server tests passed; Unity runtime custom-tool registration smoke was
+> not run.
 
 MCP for Unity makes it easy to extend your AI assistant with custom capabilities. Using C# attributes and reflection, the system automatically discovers and registers your tools—no manual configuration needed.
 

@@ -1,6 +1,10 @@
 # MCP for Unity Development Tools
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP development guide,
+> source-refreshed against `Server/pyproject.toml`, current Advanced Settings
+> UI, and checked-in dev scripts. This is not CE-specific control-surface
+> authority. `uv run --extra dev python -m pytest tests/ -q` passed; Unity
+> tests and CI were not run.
 
 | [English](README-DEV.md) | [简体中文](README-DEV-zh.md) |
 |---------------------------|------------------------------|
@@ -23,7 +27,7 @@ uv pip install -e ".[dev]"
 
 This installs:
 
-- **Runtime dependencies**: `httpx`, `fastmcp`, `mcp`, `pydantic`, `tomli`
+- **Runtime dependencies**: `httpx`, `fastmcp`, `mcp`, `pydantic`, `tomli`, `fastapi`, `uvicorn`
 - **Development dependencies**: `pytest`, `pytest-asyncio`
 
 ### Running Tests
@@ -31,44 +35,47 @@ This installs:
 ```bash
 # From the server source directory
 cd Server
-uv run pytest tests/ -v
+uv run --extra dev python -m pytest tests/ -q
 ```
 
 Or from the repo root:
 
 ```bash
 # Using uv from the server directory
-cd Server && uv run pytest tests/ -v
+cd Server && uv run --extra dev python -m pytest tests/ -q
 ```
 
-To run only integration tests:
+To run the current integration test tree:
 ```bash
-uv run pytest tests/ -v -m integration
+uv run --extra dev python -m pytest tests/integration/ -q
 ```
 
-To run only unit tests:
-```bash
-uv run pytest tests/ -v -m unit
-```
+This checkout does not define a separate `unit` pytest marker; targeted runs
+should select files or tests under `tests/integration/`.
 
 ## 🚀 Available Development Features
 
-### ✅ Development Deployment Scripts
+### ✅ Source-backed development features
 
-Quick deployment and testing tools for MCP for Unity core changes.
-**Development Mode Toggle**: Built-in Unity editor development features -> Now operating as Advanced Setting
-**Hot Reload System**: Real-time code updates without Unity restarts  -> Roslyn Runtime_Compilation Custom Tools
-**Plugin Development Kit**: Tools for creating custom MCP for Unity extensions -> Custom Tools
+- **Development Deployment Scripts**: Quick deployment and restore scripts for MCP for Unity core changes.
+- **Development Mode Toggle**: Now exposed through Advanced Settings as `Force fresh server install`.
+- **Script editing, validation, and runtime compilation**:
+  `apply_text_edits`, `script_apply_edits`, and `validate_script` are
+  source-backed. The project-scoped `runtime_compilation` custom tool source
+  exists under `CustomTools/RoslynRuntimeCompilation/` and is gated by
+  `USE_ROSLYN`; Unity import/runtime proof was not run in this pass.
+- **Plugin Development Kit**: Covered by project-scoped Custom Tools.
+- **Automated Tests**: Python tests live under `Server/tests/`; Unity/CI guidance is documented later in this file.
 
-### 🔄 Coming Soon
-- **Automated Testing Suite**: Comprehensive testing framework for contributions
-- **Debug Dashboard**: Advanced debugging and monitoring tools
+### 🔄 Still planned or separately verified
+
+- **Debug Dashboard**: Advanced debugging and monitoring tools remain outside this source-checked pass.
 
 ---
 
 ## Advanced Settings (Editor Window)
 
-Use the MCP for Unity Editor window (Window > MCP for Unity) and open **Advanced Settings** inside the Settings tab to override tooling and deploy local code during development.
+Use the MCP for Unity Editor window (`Window > MCP For Unity > Toggle MCP Window`) and open **Advanced Settings** inside the Settings tab to override tooling and deploy local code during development.
 
 ![Advanced Settings](./images/advanced-setting.png)
 
@@ -113,18 +120,20 @@ Deploys your development code to the actual installation locations for testing.
 
 **What it does:**
 
-1. Backs up original files to a timestamped folder
-2. Copies Unity Bridge code to Unity's package cache
-3. Copies Python Server code to the MCP installation folder
+1. Backs up existing package-cache `Editor/` and `Runtime/` files to a timestamped folder
+2. Copies `MCPForUnity/Editor/` to Unity's package cache
+3. Copies `MCPForUnity/Runtime/` to Unity's package cache
+4. Does not deploy the Python server; the server deploy and server-path prompt are disabled in the current batch file
 
 **Usage:**
 
 1. Run `deploy-dev.bat`
 2. Enter Unity package cache path (example provided)
-3. Enter server path (or use default: `%LOCALAPPDATA%\Programs\UnityMCP\UnityMcpServer\src`)
-4. Enter backup location (or use default: `%USERPROFILE%\Desktop\unity-mcp-backup`)
+3. Enter backup location (or use default: `%USERPROFILE%\Desktop\unity-mcp-backup`)
 
-**Note:** Dev deploy skips `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`; reduces churn and avoids copying virtualenvs.
+**Note:** Dev deploy skips Python server deployment in this checkout. It also
+skips `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`; reduces
+churn and avoids copying virtualenvs if the server deploy is re-enabled later.
 
 ### `restore-dev.bat`
 
@@ -134,7 +143,8 @@ Restores original files from backup.
 
 1. Lists available backups with timestamps
 2. Allows you to select which backup to restore
-3. Restores both Unity Bridge and Python Server files
+3. Restores Unity Bridge `Editor/` and `Runtime/` files when present
+4. Prompts for an existing legacy server path before restore; Python Server files are restored only if the selected legacy backup contains a `PythonServer/` folder
 
 ### `prune_tool_results.py`
 
@@ -169,7 +179,10 @@ To find it reliably:
 3. Right click the package and choose "Show in Explorer"
 4. That opens the exact cache folder Unity is using for your project
 
-Note: In recent builds, the Python server sources are also bundled inside the package under `Server`. This is handy for local testing or pointing MCP clients directly at the packaged server.
+Note: In this checkout, `MCPForUnity/` does not contain bundled Python server
+sources. The current config builder resolves the server from
+`git+https://github.com/CoplayDev/unity-mcp@v<package-version>#subdirectory=Server`
+unless you override the source in Advanced Settings.
 
 ## Payload sizing & paging defaults (recommended)
 
@@ -321,7 +334,10 @@ We provide a CI job to run a Natural Language Editing suite against the Unity te
 
 - Verify Unity package cache path is correct
 - Check that MCP for Unity package is actually installed
-- Ensure server is installed via MCP client
+- For `restore-dev.bat` only, the script still validates a legacy server path
+  before checking whether the selected backup contains `PythonServer/`. Current
+  `deploy-dev.bat` skips Python server deployment and only copies package
+  `Editor/` and `Runtime/` files.
 
 ### "Permission denied" errors
 
@@ -335,9 +351,13 @@ We provide a CI job to run a Natural Language Editing suite against the Unity te
 - Check backup directory permissions
 - Verify backup directory path is correct
 
-### Windows uv path issues
+### Windows uvx path issues
 
-- On Windows, when testing GUI clients, prefer the WinGet Links `uv.exe`; if multiple `uv.exe` exist, use "Choose `uv` Install Location" to pin the Links shim.
+- On Windows, when testing GUI clients, prefer the WinGet Links `uvx.exe`; if
+  multiple `uvx.exe` paths exist, open Settings -> Advanced Settings and use
+  the `UV Path:` row's `Browse` button to pin the Links shim stored in
+  `MCPForUnity.UvxPath`. The current file dialog title is `Select uv
+  Executable`.
 
 ### Domain Reload Tests Stall When Unity is Backgrounded
 

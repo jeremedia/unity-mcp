@@ -1,23 +1,88 @@
 # MCP for Unity 开发工具
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** 通用 Unity MCP 开发指南，已根据
+> `Server/pyproject.toml`、当前 Advanced Settings UI 和已检入开发脚本重新核对。
+> 本文现在包含英文指南中的依赖、测试和 Advanced Settings 要点，但仍以英文
+> `README-DEV.md` 作为完整文本；它不是 CE 专用 control-surface 权威。
+> `uv run --extra dev python -m pytest tests/ -q` 已通过；本轮未运行 Unity
+> tests 或 CI。
 
 | [English](README-DEV.md) | [简体中文](README-DEV-zh.md) |
 |---------------------------|------------------------------|
 
 欢迎来到 MCP for Unity 开发环境！此目录包含简化 MCP for Unity 核心开发的工具和实用程序。
 
+## 🛠️ 开发设置
+
+### 安装开发依赖
+
+如需贡献代码或运行测试，请在服务器源码目录中使用 `uv` 安装开发依赖：
+
+```bash
+cd Server
+uv pip install -e ".[dev]"
+```
+
+这会安装：
+
+- **运行时依赖**：`httpx`, `fastmcp`, `mcp`, `pydantic`, `tomli`, `fastapi`, `uvicorn`
+- **开发依赖**：`pytest`, `pytest-asyncio`
+
+### 运行测试
+
+```bash
+cd Server
+uv run --extra dev python -m pytest tests/ -q
+```
+
+从仓库根目录运行：
+
+```bash
+cd Server && uv run --extra dev python -m pytest tests/ -q
+```
+
+运行当前 integration test tree：
+
+```bash
+uv run --extra dev python -m pytest tests/integration/ -q
+```
+
+当前 checkout 不定义单独的 `unit` pytest marker；如需定向运行，请选择
+`tests/integration/` 下的文件或测试。
+
 ## 🚀 可用开发功能
 
-### ✅ 开发部署脚本
-用于 MCP for Unity 核心更改的快速部署和测试工具。
+### ✅ 已由当前源码支持的开发功能
 
-### 🔄 即将推出
-- **开发模式切换**：内置 Unity 编辑器开发功能
-- **热重载系统**：无需重启 Unity 的实时代码更新
-- **插件开发工具包**：用于创建自定义 MCP for Unity 扩展的工具
-- **自动化测试套件**：用于贡献的综合测试框架
-- **调试面板**：高级调试和监控工具
+- **开发部署脚本**：用于 MCP for Unity 核心更改的快速部署和恢复脚本。
+- **开发模式切换**：现在通过 Advanced Settings 中的 `Force fresh server install` 暴露。
+- **脚本编辑、验证和运行时编译**：`apply_text_edits`、`script_apply_edits` 和
+  `validate_script` 有源码支持。项目范围的 `runtime_compilation` custom tool
+  源码位于 `CustomTools/RoslynRuntimeCompilation/`，并受 `USE_ROSLYN` gated；
+  本轮未运行 Unity import/runtime proof。
+- **插件开发工具包**：通过项目范围 Custom Tools 覆盖。
+- **自动化测试**：Python tests 位于 `Server/tests/`；Unity/CI 指导在本文后面记录。
+
+### 🔄 仍待规划或需单独验证
+
+- **调试面板**：高级调试和监控工具不属于本轮 source-checked 范围。
+
+---
+
+## Advanced Settings（Editor Window）
+
+在 Unity 中打开 `Window > MCP For Unity > Toggle MCP Window`，进入 Settings tab 中的
+**Advanced Settings**，可在开发时覆盖工具路径和部署本地代码。
+
+- **UV/UVX Path Override**：当 PATH 解析错误时，指向特定 `uv`/`uvx` 可执行文件。清空后恢复自动发现。
+- **Server Source Override**：为 Python server 设置本地文件夹或 git URL（`uvx --from <url> mcp-for-unity`）。清空后使用打包默认源。
+- **Dev Mode (Force fresh server install)**：启用后，生成的 `uvx` 命令会在启动前添加 `--no-cache --refresh`。这会更慢，但可避免迭代 `Server/` 时误用旧缓存。
+- **Local Package Deployment**：选择包含 `Editor/` 和 `Runtime/` 的本地 `MCPForUnity` 文件夹，点击 **Deploy to Project** 将其复制到当前安装的包路径。备份会保存在 `Library/MCPForUnityDeployBackups`，**Restore Last Backup** 可恢复最近一次部署。
+
+提示：
+- 部署/恢复后 Unity 会自动刷新脚本；如有疑问，请重新打开 MCP 窗口并确认 Advanced Settings 中的目标路径标签。
+- 保持 source 和 target 不同，不要把 source 指向已经安装的 `PackageCache` 文件夹。
+- 使用 git 忽略的工作目录快速迭代；部署流程只复制 `Editor` 和 `Runtime`。
 
 ---
 
@@ -53,17 +118,17 @@ python mcp_source.py [--manifest /path/to/manifest.json] [--repo /path/to/unity-
 将您的开发代码部署到实际安装位置进行测试。
 
 **作用:**
-1. 将原始文件备份到带时间戳的文件夹
-2. 将 Unity Bridge 代码复制到 Unity 的包缓存
-3. 将 Python 服务器代码复制到 MCP 安装文件夹
+1. 将包缓存中现有的 `Editor/` 和 `Runtime/` 文件备份到带时间戳的文件夹
+2. 将 `MCPForUnity/Editor/` 复制到 Unity 的包缓存
+3. 将 `MCPForUnity/Runtime/` 复制到 Unity 的包缓存
+4. 不部署 Python 服务器；当前批处理文件中服务器部署和服务器路径提示都已禁用
 
 **用法:**
 1. 运行 `deploy-dev.bat`
 2. 输入 Unity 包缓存路径（提供示例）
-3. 输入服务器路径（或使用默认：`%LOCALAPPDATA%\Programs\UnityMCP\UnityMcpServer\src`）
-4. 输入备份位置（或使用默认：`%USERPROFILE%\Desktop\unity-mcp-backup`）
+3. 输入备份位置（或使用默认：`%USERPROFILE%\Desktop\unity-mcp-backup`）
 
-**注意:** 开发部署跳过 `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`；减少变动并避免复制虚拟环境。
+**注意:** 当前 checkout 的开发部署会跳过 Python 服务器部署。如果未来重新启用服务器部署，它还会跳过 `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`；减少变动并避免复制虚拟环境。
 
 ### `restore-dev.bat`
 从备份恢复原始文件。
@@ -71,7 +136,8 @@ python mcp_source.py [--manifest /path/to/manifest.json] [--repo /path/to/unity-
 **作用:**
 1. 列出可用的带时间戳的备份
 2. 允许您选择要恢复的备份
-3. 恢复 Unity Bridge 和 Python 服务器文件
+3. 如果备份中存在对应目录，则恢复 Unity Bridge 的 `Editor/` 和 `Runtime/` 文件
+4. 恢复前仍会要求输入并验证现有 legacy server path；仅当所选旧备份包含 `PythonServer/` 文件夹时才恢复 Python 服务器文件
 
 ### `prune_tool_results.py`
 将对话 JSON 中的大型 `tool_result` 块压缩为简洁的单行摘要。
@@ -103,7 +169,7 @@ X:\UnityProject\Library\PackageCache\com.coplaydev.unity-mcp@272123cfd97e
 3. 右键单击包并选择"在资源管理器中显示"
 4. 这将打开 Unity 为您的项目使用的确切缓存文件夹
 
-注意：在最新版本中，Python 服务器源代码也打包在包内的 `Server` 下。这对于本地测试或将 MCP 客户端直接指向打包服务器很方便。
+注意：在当前 checkout 中，`MCPForUnity/` 不包含打包的 Python 服务器源代码。当前配置生成器会从 `git+https://github.com/CoplayDev/unity-mcp@v<package-version>#subdirectory=Server` 解析服务器，除非您在 Advanced Settings 中覆盖源地址。
 
 ## MCP Bridge 压力测试
 
@@ -207,7 +273,9 @@ python3 tools/stress_mcp.py \
 ### 运行 .bat 文件时出现"路径未找到"错误
 - 验证 Unity 包缓存路径是否正确
 - 检查是否实际安装了 MCP for Unity 包
-- 确保通过 MCP 客户端安装了服务器
+- 仅对 `restore-dev.bat`：脚本在检查所选备份是否包含 `PythonServer/`
+  前，仍会验证一个 legacy server path。当前 `deploy-dev.bat` 跳过
+  Python server 部署，只复制 package 的 `Editor/` 和 `Runtime/` 文件。
 
 ### "权限被拒绝"错误
 - 以管理员身份运行 cmd
@@ -219,5 +287,5 @@ python3 tools/stress_mcp.py \
 - 检查备份目录权限
 - 验证备份目录路径是否正确
 
-### Windows uv 路径问题
-- 在 Windows 上测试 GUI 客户端时，优先选择 WinGet Links `uv.exe`；如果存在多个 `uv.exe`，使用"Choose `uv` Install Location"来固定 Links shim。
+### Windows uvx 路径问题
+- 在 Windows 上测试 GUI 客户端时，优先选择 WinGet Links `uvx.exe`；如果存在多个 `uvx.exe` 路径，请打开 Settings -> Advanced Settings，并使用 `UV Path:` 行的 `Browse` 按钮固定存储在 `MCPForUnity.UvxPath` 中的 Links shim。当前文件对话框标题是 `Select uv Executable`。

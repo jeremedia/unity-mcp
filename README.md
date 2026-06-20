@@ -1,4 +1,10 @@
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP bridge documentation,
+> source-refreshed against `MCPForUnity/package.json`,
+> `Server/pyproject.toml`, the Python tool registry, Unity-side tool handlers,
+> and current client-config/server-launch builders. This is not CE-specific
+> Builder control-surface authority. Python server tests passed with
+> `uv run --extra dev python -m pytest tests/ -q`; Unity/client runtime smoke
+> tests were not run.
 
 <img width="676" height="380" alt="MCP for Unity" src="docs/images/logo.png" />
 
@@ -50,21 +56,27 @@ MCP for Unity acts as a bridge, allowing AI assistants (Claude, Cursor, Antigrav
 * `manage_prefabs`: Performs prefab operations (create, modify, delete, etc.).
 * `manage_scene`: Manages scenes (load, save, create, get hierarchy, etc.).
 * `manage_script`: Compatibility router for legacy script operations (create, read, delete). Prefer `apply_text_edits` or `script_apply_edits` for edits.
+* `manage_script_capabilities`: Reports supported script edit operations, text edit operations, payload limits, and guard behavior.
 * `manage_scriptable_object`: Creates and modifies ScriptableObject assets using Unity SerializedObject property paths.
 * `manage_shader`: Performs shader CRUD operations (create, read, modify, delete).
 * `read_console`: Gets messages from or clears the console.
+* `refresh_unity`: Requests an AssetDatabase refresh and optional script compilation, with an optional readiness wait.
 * `run_tests_async`: Starts tests asynchronously and returns a job_id for polling (preferred).
 * `get_test_job`: Polls an async test job for progress and results.
 * `run_tests`: Runs tests synchronously (blocks until complete; prefer `run_tests_async` for long suites).
 * `execute_custom_tool`: Execute a project-scoped custom tool registered by Unity.
 * `execute_menu_item`: Executes Unity Editor menu items (e.g., "File/Save Project").
 * `set_active_instance`: Routes subsequent tool calls to a specific Unity instance (when multiple are running). Requires the exact `Name@hash` from `unity_instances`.
+* `batch_execute`: Runs a bounded list of MCP tool calls as one batch through Unity.
+* `get_performance_stats`: Gets Unity Editor performance marker summaries, details, or spike-only reports.
 * `apply_text_edits`: Precise text edits with precondition hashes and atomic multi-edit batches.
 * `script_apply_edits`: Structured C# method/class edits (insert/replace/delete) with safer boundaries.
 * `validate_script`: Fast validation (basic/standard) to catch syntax/structure issues before/after writes.
 * `create_script`: Create a new C# script at the given project path.
 * `delete_script`: Delete a C# script by URI or Assets-relative path.
+* `find_in_file`: Searches a Unity-readable file with a regex pattern and returns line numbers and excerpts.
 * `get_sha`: Get SHA256 and basic metadata for a Unity C# script without returning file contents.
+* `debug_request_context`: Returns FastMCP request/session context diagnostics for routing/debugging.
 </details>
 
 
@@ -74,13 +86,15 @@ MCP for Unity acts as a bridge, allowing AI assistants (Claude, Cursor, Antigrav
   Your LLM can retrieve the following resources:
 
 * `custom_tools`: Lists custom tools available for the active Unity project.
-* `unity_instances`: Lists all running Unity Editor instances with their details (name, path, port, status).
+* `unity_instances`: Lists running Unity Editor instances. HTTP entries include `id`, `name`, `hash`, `unity_version`, `connected_at`, and `session_id`; stdio entries also include `path`, `port`, `status`, and `last_heartbeat`.
 * `menu_items`: Retrieves all available menu items in the Unity Editor.
-* `tests`: Retrieves all available tests in the Unity Editor. Can select tests of a specific type (e.g., "EditMode", "PlayMode").
+* `get_tests`: Retrieves all available tests in the Unity Editor.
+* `get_tests_for_mode`: Retrieves tests for a specific mode (e.g., "EditMode", "PlayMode").
 * `editor_active_tool`: Currently active editor tool (Move, Rotate, Scale, etc.) and transform handle settings.
 * `editor_prefab_stage`: Current prefab editing context if a prefab is open in isolation mode.
 * `editor_selection`: Detailed information about currently selected objects in the editor.
 * `editor_state`: Current editor runtime state including play mode, compilation status, active scene, and selection summary.
+* `editor_state_v2`: Canonical editor readiness snapshot with advice and server-computed staleness.
 * `editor_windows`: All currently open editor windows with their titles, types, positions, and focus state.
 * `project_info`: Static project information including root path, Unity version, and platform.
 * `project_layers`: All layers defined in the project's TagManager with their indices (0-31).
@@ -171,10 +185,10 @@ https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v8.7.0
 
 HTTP transport is enabled out of the box. The Unity window can launch the FastMCP server for you:
 
-1. Open `Window > MCP for Unity`.
+1. Open `Window > MCP For Unity > Toggle MCP Window`.
 2. Make sure the **Transport** dropdown is set to `HTTP Local` (default) and the **HTTP URL** is what you want (defaults to `http://localhost:8080`).
-3. Click **Start Server**. Unity spawns a new operating-system terminal running `uv ... server.py --transport http`.
-4. Keep that terminal window open while you work; closing it stops the server. Use the **Stop Session** button in the Unity window if you need to tear it down cleanly.
+3. Click **Start Server**. Unity shows the core `uvx --from ... mcp-for-unity --transport http --http-url <url>` command and, when it owns the local launch, appends lifecycle args such as `--pidfile <path>` and `--unity-instance-token <token>` before opening the operating-system terminal.
+4. Keep that terminal window open while you work; closing it stops the server. Use the **Stop Server** button in the Unity window if you need to tear it down cleanly.
 
 > Prefer stdio? Change the transport dropdown to `Stdio` and Unity will fall back to the embedded TCP bridge instead of launching the HTTP server.
 
@@ -189,32 +203,40 @@ uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Serve
 Keep the process running while clients are connected.
 
 ### 🛠️ Step 3: Configure Your MCP Client
-Connect your MCP Client (Claude, Cursor, etc.) to the HTTP server from Step 2 (auto) or via Manual Configuration (below).
+Connect your MCP Client to the HTTP server from Step 2 (auto) or via Manual Configuration (below). Claude Desktop and Cherry Studio are current non-HTTP exceptions in source: Claude Desktop supports stdio only, and Cherry Studio uses manual UI configuration with stdio values, so switch the transport dropdown to `Stdio` before configuring either one.
 
-For **Claude Desktop** Users, try using our manually scrapped Unity_Skills by downloading and uploading the claude_skill_unity.zip following this [link](https://www.claude.com/blog/skills).
+For **Claude Desktop** users, try using our manually curated Unity_Skills by downloading and uploading the claude_skill_unity.zip following this [link](https://www.claude.com/blog/skills).
 
-**Option A: Configure Buttons (Recommended for Claude/Cursor/VSC Copilot)**
+**Option A: Configure Buttons (recommended for source-registered clients)**
 
-1. In Unity, go to `Window > MCP for Unity`.
+1. In Unity, go to `Window > MCP For Unity > Toggle MCP Window`.
 2. Select your Client/IDE from the dropdown.
 3. Click the `Configure` Button.  (Or the `Configure All Detected Clients` button will try to configure every client it finds, but takes longer.)
-4. Look for a green status indicator 🟢 and "Connected ✓". *(This writes the HTTP `url` pointing at the server you launched in Step 2.)* 
+4. Look for the green status dot and `Configured` / `Connected` status text. For HTTP-capable clients this writes the HTTP `url` pointing at the server you launched in Step 2. For Claude Desktop and Cherry Studio, switch to `Stdio` first; their configurators refuse HTTP.
+
+The Client Configuration dropdown is source-populated from registered
+configurators. Current source includes Antigravity, Cherry Studio, Claude Code,
+Claude Desktop, CodeBuddy CLI, Codex, Cursor, Kilo Code, Kiro, Rider GitHub
+Copilot, Trae, VSCode GitHub Copilot, VSCode Insiders GitHub Copilot, and
+Windsurf.
 
 <details><summary><strong>Client-specific troubleshooting</strong></summary>
 
-  - **VSCode**: uses `Code/User/mcp.json` with top-level `servers.unityMCP`, `"type": "http"`, and the URL from Step 2. On Windows, MCP for Unity still prefers an absolute `uv.exe` path when you switch back to stdio.
-  - **Cursor / Windsurf** [(**help link**)](https://github.com/CoplayDev/unity-mcp/wiki/1.-Fix-Unity-MCP-and-Cursor,-VSCode-&-Windsurf): if `uv` is missing, the MCP for Unity window shows "uv Not Found" with a quick [HELP] link and a "Choose `uv` Install Location" button.
-  - **Claude Code** [(**help link**)](https://github.com/CoplayDev/unity-mcp/wiki/2.-Fix-Unity-MCP-and-Claude-Code): if `claude` isn't found, the window shows "Claude Not Found" with [HELP] and a "Choose Claude Location" button. Unregister now updates the UI immediately.</details>
+  - **VSCode**: uses `Code/User/mcp.json` with top-level `servers.unityMCP`, `"type": "http"`, and the URL from Step 2. On Windows, MCP for Unity resolves and stores an absolute `uvx.exe` path when you switch back to stdio.
+  - **Cursor / Windsurf** [(**help link**)](https://github.com/CoplayDev/unity-mcp/wiki/1.-Fix-Unity-MCP-and-Cursor,-VSCode-&-Windsurf): if the resolved uv/uvx path is missing or wrong, open Settings -> Advanced Settings and use the `UV Path:` row's `Browse` button. The file dialog title is `Select uv Executable`.
+  - **Claude Code** [(**help link**)](https://github.com/CoplayDev/unity-mcp/wiki/2.-Fix-Unity-MCP-and-Claude-Code): the Client Configuration section shows `Claude CLI Path:`. If it is missing, the field says `Not found - click Browse to select`; use `Browse` to open the `Select Claude CLI` file dialog. Unregister now updates the UI immediately.
+  - **Claude Desktop**: does not support HTTP transport in this plugin. Switch the Unity transport dropdown to `Stdio`, then use `Configure` or the stdio JSON snippet below.
+  - **Cherry Studio**: does not support HTTP transport in this plugin and does not auto-write config files. Switch to `Stdio`, then use the manual snippet values in Cherry Studio's Settings -> MCP Server UI.</details>
 
 
 **Option B: Manual Configuration**
 
-If Auto-Setup fails or you use a different client:
+If Configure fails or you use a different client:
 
 1. **Find your MCP Client's configuration file.** (Check client documentation).
     * *Claude Example (macOS):* `~/Library/Application Support/Claude/claude_desktop_config.json`
     * *Claude Example (Windows):* `%APPDATA%\Claude\claude_desktop_config.json`
-2. **Edit the file** to add/update the `mcpServers` section so it points at the HTTP endpoint from Step 2.
+2. **Edit the file** to add/update the `mcpServers` section. Use HTTP snippets for HTTP-capable clients; use stdio for Claude Desktop and Cherry Studio.
 
 <details>
 <summary><strong>Click for Client-Specific JSON Configuration Snippets...</strong></summary>
@@ -224,17 +246,15 @@ If Auto-Setup fails or you use a different client:
 
 If you're using Claude Code, you can register the MCP server using the below commands:
 
-**macOS:**
+**HTTP default:**
 
 ```bash
-claude mcp add --scope user UnityMCP -- uv --directory /Users/USERNAME/Library/AppSupport/UnityMCP/UnityMcpServer/src run server.py
+claude mcp add --transport http UnityMCP http://localhost:8080/mcp
 ```
 
-**Windows:**
+The Unity window stores a base HTTP URL such as `http://localhost:8080`; MCP
+client configs use that base plus `/mcp`.
 
-```bash
-claude mcp add --scope user UnityMCP -- "C:/Users/USERNAME/AppData/Local/Microsoft/WinGet/Links/uv.exe" --directory "C:/Users/USERNAME/AppData/Local/UnityMCP/UnityMcpServer/src" run server.py
-```
 **VSCode (all OS – HTTP default)**
 
 ```json
@@ -248,7 +268,7 @@ claude mcp add --scope user UnityMCP -- "C:/Users/USERNAME/AppData/Local/Microso
 }
 ```
 
-**macOS / Windows / Linux (Claude Desktop, Cursor, Claude Code, Windsurf, etc. – HTTP default)**
+**macOS / Windows / Linux (Cursor and other JSON clients that use `url`)**
 
 ```json
 {
@@ -260,25 +280,43 @@ claude mcp add --scope user UnityMCP -- "C:/Users/USERNAME/AppData/Local/Microso
 }
 ```
 
-Set the URL to match whatever you entered in the Unity window (include `/mcp`).
+**Windsurf / Antigravity (HTTP)**
+
+```json
+{
+  "mcpServers": {
+    "unityMCP": {
+      "serverUrl": "http://localhost:8080/mcp",
+      "disabled": false
+    }
+  }
+}
+```
+
+Set the client URL to the Unity window's base URL plus `/mcp`.
 
 #### Stdio configuration examples (legacy / optional)
 
-Switch the Unity transport dropdown to `Stdio`, then use one of the following `command`/`args` blocks.
+Switch the Unity transport dropdown to `Stdio`, then use one of the following `command`/`args` blocks. Current generated JSON/TOML stdio configs use `uvx --from <server-source> mcp-for-unity --transport stdio`; the generated Claude Code CLI omits the trailing server-side flag and relies on the server's default stdio transport. They no longer point at a local `server.py` file. Claude Desktop and Cherry Studio must use this mode; Cherry Studio expects the command and args copied into its Settings -> MCP Server UI rather than written to a JSON file by the configurator.
 
-**VSCode (stdio)**
+**Claude Code (stdio)**
+
+```bash
+claude mcp add --transport stdio UnityMCP -- uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server" mcp-for-unity
+```
+
+**VSCode (stdio JSON shape)**
 
 ```json
 {
   "servers": {
     "unityMCP": {
       "type": "stdio",
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "<ABSOLUTE_PATH_TO>/UnityMcpServer/src",
-        "run",
-        "server.py",
+        "--from",
+        "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server",
+        "mcp-for-unity",
         "--transport",
         "stdio"
       ]
@@ -287,18 +325,17 @@ Switch the Unity transport dropdown to `Stdio`, then use one of the following `c
 }
 ```
 
-**macOS / Linux (stdio)**
+**Claude Desktop / macOS / Linux (stdio)**
 
 ```json
 {
   "mcpServers": {
     "unityMCP": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
-        "--directory",
-        "/Users/YOUR_USERNAME/Library/AppSupport/UnityMCP/UnityMcpServer/src",
-        "server.py",
+        "--from",
+        "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server",
+        "mcp-for-unity",
         "--transport",
         "stdio"
       ]
@@ -313,12 +350,11 @@ Switch the Unity transport dropdown to `Stdio`, then use one of the following `c
 {
   "mcpServers": {
     "unityMCP": {
-      "command": "C:/Users/YOUR_USERNAME/AppData/Local/Microsoft/WinGet/Links/uv.exe",
+      "command": "C:/Users/YOUR_USERNAME/AppData/Local/Microsoft/WinGet/Links/uvx.exe",
       "args": [
-        "run",
-        "--directory",
-        "C:/Users/YOUR_USERNAME/AppData/Local/UnityMCP/UnityMcpServer/src",
-        "server.py",
+        "--from",
+        "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server",
+        "mcp-for-unity",
         "--transport",
         "stdio"
       ]
@@ -327,7 +363,7 @@ Switch the Unity transport dropdown to `Stdio`, then use one of the following `c
 }
 ```
 
-Replace `YOUR_USERNAME` and `AppSupport` path segments as needed for your platform.
+Replace absolute `uvx` paths as needed for your platform, or use the snippet copied from the Unity window.
 
 </details>
 
@@ -335,9 +371,9 @@ Replace `YOUR_USERNAME` and `AppSupport` path segments as needed for your platfo
 
 ## Usage ▶️
 
-1. **Open your Unity Project** and verify the HTTP server is running (Window > MCP for Unity > Start Local HTTP Server). The indicator should show "Session Active" once the server is up.
+1. **Open your Unity Project**, open `Window > MCP For Unity > Toggle MCP Window`, and verify the HTTP server is running after you click **Start Server**. The indicator should show "Session Active" once the server is up.
     
-2. **Start your MCP Client** (Claude, Cursor, etc.). It connects to the HTTP endpoint configured in Step 3—no extra terminals will be spawned by the client.
+2. **Start your HTTP-capable MCP client** (Cursor, VS Code, Windsurf, Claude Code, etc.). It connects to the HTTP endpoint configured in Step 3; Claude Desktop and Cherry Studio use the stdio configuration above.
     
 3. **Interact!** Unity tools should now be available in your MCP Client.
 
@@ -408,19 +444,15 @@ Your privacy matters to us. All telemetry is optional and designed to respect yo
 
 - **Unity Bridge Not Running/Connecting:**
     - Ensure Unity Editor is open.
-    - Check the status window: Window > MCP for Unity.
+    - Check the status window: `Window > MCP For Unity > Toggle MCP Window`.
     - Restart Unity.
 - **MCP Client Not Connecting / Server Not Starting:**
-    - Make sure the local HTTP server is running (Window > MCP for Unity > Start Server). Keep the spawned terminal window open.
-    - **Verify Server Path:** Double-check the --directory path in your MCP Client's JSON config. It must exactly match the installation location:
-      - **Windows:** `%USERPROFILE%\AppData\Local\UnityMCP\UnityMcpServer\src`
-      - **macOS:** `~/Library/AppSupport/UnityMCP/UnityMcpServer\src` 
-      - **Linux:** `~/.local/share/UnityMCP/UnityMcpServer\src`
-    - **Verify uv:** Make sure `uv` is installed and working (`uv --version`).
+    - Make sure the local HTTP server is running from the MCP window after `Window > MCP For Unity > Toggle MCP Window` and **Start Server**. Keep the spawned terminal window open.
+    - **Verify HTTP URL:** Ensure the client config points at the Unity window's HTTP URL plus `/mcp` (default `http://localhost:8080/mcp`).
+    - **Verify uv/uvx:** Make sure `uv` and `uvx` are installed and working (`uv --version` and `uvx --version`).
     - **Run Manually:** Try running the server directly from the terminal to see errors: 
       ```bash
-      cd /path/to/your/UnityMCP/UnityMcpServer/src
-      uv run server.py
+      uvx --from "git+https://github.com/CoplayDev/unity-mcp@v8.7.0#subdirectory=Server" mcp-for-unity --transport http --http-url http://localhost:8080
       ```
 - **Configuration Failed:**
     - Use the Manual Configuration steps. The plugin may lack permissions to write to the MCP client's config file.

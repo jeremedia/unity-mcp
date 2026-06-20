@@ -1,6 +1,11 @@
 # MCP for Unity Telemetry
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> CE-specific control-surface authority. Source-rechecked against
+> `Server/src/core/telemetry.py`, `Server/src/core/config.py`,
+> `TelemetryHelper.cs`, `EditorPrefKeys.cs`, and `manage_editor.py`.
+> Python server tests passed; live telemetry transmission and Unity UI smoke
+> were not run.
 
 MCP for Unity includes privacy-focused, anonymous telemetry to help us improve the product. This document explains what data is collected, how to opt out, and our privacy practices.
 
@@ -47,8 +52,11 @@ export UNITY_MCP_DISABLE_TELEMETRY=true
 export MCP_DISABLE_TELEMETRY=true
 ```
 
-### Method 2: Unity Editor (Coming Soon)
-In Unity Editor: `Window > MCP for Unity > Settings > Disable Telemetry`
+### Method 2: Unity EditorPrefs
+Unity-side telemetry honors the `MCPForUnity.TelemetryDisabled` EditorPrefs key.
+Use `Window > MCP For Unity > Edit EditorPrefs` to inspect or set it, or call
+`TelemetryHelper.DisableTelemetry()` from editor code. No main Settings-tab
+checkbox was source-verified in this pass.
 
 ### Method 3: Manual Config
 Add to your MCP client config:
@@ -151,7 +159,7 @@ Here's what a typical telemetry event looks like:
   "timestamp": 1704067200,
   "customer_uuid": "550e8400-e29b-41d4-a716-446655440000", 
   "session_id": "abc123-def456-ghi789",
-  "version": "3.0.2",
+  "version": "8.7.0",
   "platform": "posix",
   "data": {
     "tool_name": "manage_script",

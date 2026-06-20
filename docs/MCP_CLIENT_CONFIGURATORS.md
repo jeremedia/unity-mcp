@@ -1,6 +1,10 @@
 # MCP Client Configurators
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> CE-specific control-surface authority. Source-rechecked against
+> `MCPForUnity/Editor/Clients/`, `ConfigJsonBuilder.cs`,
+> `CodexConfigHelper.cs`, and the current configurator registry. Python server
+> tests passed; Unity/client configuration smoke was not run.
 
 This guide explains how MCP client configurators work in this repo and how to add a new one.
 

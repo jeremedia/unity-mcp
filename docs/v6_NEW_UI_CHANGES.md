@@ -1,5 +1,11 @@
 # MCP for Unity v6 - New Editor Window
 
+> **Status audit (2026-06-20):** Historical v6 UI design note for the general
+> Unity MCP bridge, not CE-specific control-surface authority. Source-rechecked
+> against current menu/window paths; use current `README.md` and
+> `MCPForUnity/README.md` for active setup instructions. No Unity UI runtime
+> smoke was run.
+
 > **UI Toolkit-based window with service-oriented architecture**
 
 ![New MCP Editor Window Dark](./images/v6_new_ui_dark.png)
@@ -14,7 +20,7 @@
 
 The new MCP Editor Window is a complete rebuild using **UI Toolkit (UXML/USS)** with a **service-oriented architecture**. The design philosophy emphasizes **explicit over implicit** behavior, making the system more predictable, testable, and maintainable.
 
-**Quick Access:** `Cmd/Ctrl+Shift+M` or `Window > MCP For Unity > Open MCP Window`
+**Quick Access:** `Cmd/Ctrl+Shift+M` or `Window > MCP For Unity > Toggle MCP Window`
 
 **Key Improvements:**
 - 🎨 Modern UI that doesn't hide info as the window size changes
@@ -73,7 +79,7 @@ The new window intentionally removes implicit behaviors and complex edge-case ha
 ### ❌ Python Detection Warning
 - **Old:** Warning banner if Python not detected on system
 - **Why Removed:** Setup Wizard handles dependency checks, we also can't flood a bunch of error and warning logs when submitting to the Asset Store
-- **Alternative:** Run Setup Wizard via `Window > MCP For Unity > Setup Wizard`
+- **Alternative:** Run the setup window via `Window > MCP For Unity > Setup Window`
 
 ### ❌ Separate Manual Setup Windows
 - **Old:** `VSCodeManualSetupWindow`, `ManualConfigEditorWindow` popup dialogs
@@ -216,9 +222,9 @@ MCPForUnity/Editor/Helpers/
 **UI:**
 ```text
 MCPForUnity/Editor/Windows/
-├── MCPForUnityEditorWindowNew.cs    # Main window (~850 lines)
-├── MCPForUnityEditorWindowNew.uxml  # UI Toolkit layout
-└── MCPForUnityEditorWindowNew.uss   # UI Toolkit styles
+├── MCPForUnityEditorWindow.cs       # Main window
+├── MCPForUnityEditorWindow.uxml     # UI Toolkit layout
+└── MCPForUnityEditorWindow.uss      # UI Toolkit styles
 ```
 
 **CI/CD:**

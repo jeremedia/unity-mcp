@@ -1,6 +1,11 @@
 # MCP for Unity Server
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** General Unity MCP server documentation,
+> source-refreshed against `Server/pyproject.toml`, the Python tool/resource
+> registries, and current `uvx`/HTTP/stdio launch paths. This is not CE-specific
+> Builder control-surface authority. Source metadata and `Server/uv.lock` now
+> agree on `8.7.0`; `uv run --extra dev python -m pytest tests/ -q` passed.
+> Docker and Unity runtime smoke tests were not run.
 
 [![MCP](https://badge.mcpx.dev?status=on 'MCP Enabled')](https://modelcontextprotocol.io/introduction)
 [![python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
@@ -14,6 +19,11 @@ Model Context Protocol server for Unity Editor integration. Control Unity throug
 💬 **Join our community:** [Discord Server](https://discord.gg/y4p8KfzrN4)
 
 **Required:** Install the [Unity MCP Plugin](https://github.com/CoplayDev/unity-mcp?tab=readme-ov-file#-step-1-install-the-unity-package) to connect Unity Editor with this MCP server. You also need `uvx` (requires [uv](https://docs.astral.sh/uv/)) to run the server.
+
+**Repository-source caveat:** `pyproject.toml` and `uv.lock` both record
+`mcpforunityserver` version `8.7.0` in this checkout. Docker builds still need
+an explicit build or container smoke test before the image should be treated as
+verified-current.
 
 ---
 
@@ -34,7 +44,7 @@ uvx --from mcpforunityserver mcp-for-unity --transport http --http-url http://lo
 ```json
 {
   "mcpServers": {
-    "UnityMCP": {
+    "unityMCP": {
       "url": "http://localhost:8080/mcp"
     }
   }
@@ -46,7 +56,7 @@ uvx --from mcpforunityserver mcp-for-unity --transport http --http-url http://lo
 ```json
 {
   "mcpServers": {
-    "UnityMCP": {
+    "unityMCP": {
       "command": "uvx",
       "args": [
         "--from",
@@ -67,7 +77,7 @@ Use this to run the latest released version from the repository. Change the vers
 ```json
 {
   "mcpServers": {
-    "UnityMCP": {
+    "unityMCP": {
       "command": "uvx",
       "args": [
         "--from",
@@ -86,17 +96,20 @@ Use this to run the latest released version from the repository. Change the vers
 **Use Pre-built Image:**
 
 ```bash
-docker run -p 8080:8080 msanatan/mcp-for-unity-server:latest --transport http --http-url http://0.0.0.0:8080
+docker run -p 8080:8080 msanatan/mcp-for-unity-server:latest
 ```
 
 **Build Locally:**
 
 ```bash
-docker build -t unity-mcp-server .
-docker run -p 8080:8080 unity-mcp-server --transport http --http-url http://0.0.0.0:8080
+docker build -f Server/Dockerfile -t unity-mcp-server .
+docker run -p 8080:8080 unity-mcp-server
 ```
 
-Configure your MCP client with `"url": "http://localhost:8080/mcp"`.
+Run the build command from the repository root. The checked-in
+`Server/Dockerfile` copies the repository into `/app`, switches to
+`/app/Server`, and starts `src/main.py` in HTTP mode on `0.0.0.0:8080` by
+default. Configure your MCP client with `"url": "http://localhost:8080/mcp"`.
 
 ### Option 4: Local Development
 
@@ -108,19 +121,36 @@ git clone https://github.com/CoplayDev/unity-mcp.git
 cd unity-mcp/Server
 
 # Run with uv
-uv run src/main.py --transport stdio
+uv run python src/main.py --transport stdio
 ```
 
 ---
 
 ## Configuration
 
-The server connects to Unity Editor automatically when both are running. No additional configuration needed.
+The server process alone is not enough for Unity tool execution. In HTTP mode,
+the Unity package must connect a session to the same base URL; the MCP client
+uses `<base>/mcp`, while the Unity plugin opens the WebSocket session at
+`<base>/hub/plugin`. In the normal local flow, the Unity window's **Start
+Server** action starts the server and then auto-starts that Unity session.
 
 **Environment Variables:**
 
-- `DISABLE_TELEMETRY=true` - Opt out of anonymous usage analytics
-- `LOG_LEVEL=DEBUG` - Enable detailed logging (default: INFO)
+- `UNITY_MCP_DEFAULT_INSTANCE` - Default Unity instance to target.
+- `UNITY_MCP_SKIP_STARTUP_CONNECT` - Skip initial Unity connection attempt
+  (`1`, `true`, `yes`, or `on`).
+- `UNITY_MCP_TRANSPORT` - Transport protocol (`stdio` or `http`). Current
+  parser defaults mean `--transport http` is the reliable way to start HTTP.
+- `UNITY_MCP_HTTP_URL` - HTTP server URL; currently this can override
+  `--http-url`.
+- `UNITY_MCP_HTTP_HOST` / `UNITY_MCP_HTTP_PORT` - HTTP host/port; explicit
+  `--http-host` and `--http-port` override these.
+- `UNITY_MCP_TELEMETRY_ENDPOINT` / `UNITY_MCP_TELEMETRY_TIMEOUT` - Telemetry
+  endpoint and timeout controls.
+- `UNITY_MCP_TELEMETRY_ENABLED` - Listed in server help as an enable flag;
+  current runtime opt-out checks are the disable aliases below.
+- `DISABLE_TELEMETRY=true`, `UNITY_MCP_DISABLE_TELEMETRY=true`, or
+  `MCP_DISABLE_TELEMETRY=true` - Opt out of anonymous usage analytics.
 
 ---
 

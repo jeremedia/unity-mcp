@@ -1,6 +1,11 @@
 # MCP for Unity v5 Migration Guide
 
-> **Status audit (2026-05-03):** General Unity MCP bridge documentation, not CE-specific control-surface authority. Verify current version and UI wording against `MCPForUnity/package.json` and server source.
+> **Status audit (2026-06-20):** Historical v5 migration guide for the general
+> Unity MCP bridge, not CE-specific control-surface authority. Source-rechecked
+> only for the enduring package-path fact: current package source is still
+> `MCPForUnity/`, not `UnityMcpBridge/`. Current menu wording is
+> `Window > MCP For Unity > Toggle MCP Window`; this guide's screenshots and
+> rebuild flow are historical and were not runtime-smoked.
 
 This guide will help you migrate from the legacy UnityMcpBridge installation to the new MCPForUnity package structure in version 5.
 
@@ -32,7 +37,7 @@ Version 5 introduces a new package structure. The package is now installed from 
 
 After installing the new package, you need to rebuild the MCP server:
 
-1. In Unity, go to **Window > MCP for Unity > Open MCP Window**
+1. In Unity, go to **Window > MCP For Unity > Toggle MCP Window**
 ![Opening the MCP window](images/v5_03_open_mcp_window.png)
 2. Click the **Rebuild MCP Server** button
 ![Rebuilding the MCP server](images/v5_04_rebuild_mcp_server.png)
