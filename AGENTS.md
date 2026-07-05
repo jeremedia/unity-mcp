@@ -1,31 +1,24 @@
 # AGENTS.md - Unity MCP in the CE Workspace
 
-> **Status audit (2026-06-20):** Active workspace guidance for Jeremy's fork
-> of `CoplayDev/unity-mcp`. Source-reviewed
-> `MCPForUnity/package.json`, `Server/pyproject.toml`, `Server/uv.lock`,
-> Unity-side tools, and Python server tool/resource registration. Current
-> package/server/lockfile version is `8.7.0`. Python server tests pass with the
-> dev-extra command below. This is the generic Unity MCP bridge, not the CE
-> Builder control-surface package. No Unity/client/Docker runtime smoke was run
-> in this pass.
+> **Status audit (2026-07-04):** Active Codex-facing guidance for Jeremy's fork of
+> `CoplayDev/unity-mcp` — the generic Unity MCP bridge in the CE workspace, NOT
+> the CE Builder control-surface package. Package/server/lockfile version `8.7.0`.
+> Known-red: none.
+> Not proven: no Unity import / Editor-window / client-config / Docker runtime
+> smoke, stdio MCP client smoke, Unity-attached tool execution, CE consumer
+> response, clean-worktree, remote, or release proof.
+> Probe evidence lives in git history (`git log -p AGENTS.md`).
 
 ## Current Status
 
 This repository is Jeremy's fork of `CoplayDev/unity-mcp`. It is currently the
-general MCP for Unity bridge, not a CE-specific Builder control-surface
-package.
+general MCP for Unity bridge, not a CE-specific Builder control-surface package.
 
-Verified on 2026-06-20:
-
-- Unity package: `MCPForUnity/package.json`, `com.coplaydev.unity-mcp`, version `8.7.0`
-- Python server: `Server/pyproject.toml`, `mcpforunityserver`, version `8.7.0`
-- Lockfile: `Server/uv.lock` records the editable `mcpforunityserver` package
-  as version `8.7.0`.
-- Unity tools: `MCPForUnity/Editor/Tools/`
-- Python tools: `Server/src/services/tools/`
-- Python tool/resource registries: `Server/src/services/registry/`, `Server/src/services/tools/__init__.py`, and `Server/src/services/resources/__init__.py`
-- Python tests: `uv run --extra dev python -m pytest tests/ -q` passed
-  94 tests, skipped 2, and xpassed 7.
+Version authority (both must agree): `MCPForUnity/package.json`
+(`com.coplaydev.unity-mcp`) and `Server/pyproject.toml` (`mcpforunityserver`),
+`8.7.0` at this audit. Unity tools: `MCPForUnity/Editor/Tools/`. Python tools:
+`Server/src/services/tools/`. Registries: `Server/src/services/registry/`,
+`Server/src/services/tools/__init__.py`, `Server/src/services/resources/__init__.py`.
 
 ## CE Boundary
 
