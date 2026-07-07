@@ -1,10 +1,12 @@
 # MCP Client Configurators
 
-> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> **Status audit (2026-07-04):** General Unity MCP bridge documentation, not
 > CE-specific control-surface authority. Source-rechecked against
 > `MCPForUnity/Editor/Clients/`, `ConfigJsonBuilder.cs`,
 > `CodexConfigHelper.cs`, and the current configurator registry. Python server
-> tests passed; Unity/client configuration smoke was not run.
+> tests passed with 94 passed, 2 skipped, and 7 xpassed; a local FastMCP HTTP
+> smoke proved the server endpoint shape, but Unity/client configuration smoke
+> and config-file write/readback were not run.
 
 This guide explains how MCP client configurators work in this repo and how to add a new one.
 
@@ -259,7 +261,7 @@ After adding your configurator class:
 
 ## Adding a custom (non-JSON) client
 
-If your MCP client doesnt store configuration as a JSON file, you likely need a custom base class.
+If your MCP client doesn't store configuration as a JSON file, you likely need a custom base class.
 
 ### Codex-style TOML client
 

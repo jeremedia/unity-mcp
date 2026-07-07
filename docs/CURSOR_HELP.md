@@ -1,7 +1,9 @@
-> **Status audit (2026-06-20):** Windows client-path troubleshooting note,
+> **Status audit (2026-07-04):** Windows client-path troubleshooting note,
 > source-refreshed against the current `uvx` path resolver and generated stdio
-> config shape. This is not CE-specific control-surface authority, and this pass
-> did not run Windows client smoke tests.
+> config shape. This is not CE-specific control-surface authority, and this slice
+> did not run Windows client smoke tests. Python server tests passed with
+> 94 passed, 2 skipped, and 7 xpassed; a local Mac FastMCP HTTP smoke does not
+> verify this Windows stdio path guidance.
 
 ### Cursor/VSCode/Windsurf: uvx path issue on Windows (diagnosis and fix)
 

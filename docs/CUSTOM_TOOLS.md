@@ -1,12 +1,14 @@
 # Adding Custom Tools to MCP for Unity
 
-> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> **Status audit (2026-07-04):** General Unity MCP bridge documentation, not
 > CE-specific control-surface authority. Source-rechecked against
 > `MCPForUnity/Editor/Tools/McpForUnityToolAttribute.cs`,
 > `ToolDiscoveryService`, `CommandRegistry`, the WebSocket custom-tool
 > registration path, and `Server/src/services/tools/execute_custom_tool.py`.
-> Python server tests passed; Unity runtime custom-tool registration smoke was
-> not run.
+> Python server tests passed with 94 passed, 2 skipped, and 7 xpassed; a local
+> FastMCP HTTP smoke listed the `unity://custom-tools` resource, but did not
+> attach to Unity or execute custom-tool registration. Unity runtime custom-tool
+> registration smoke was not run.
 
 MCP for Unity makes it easy to extend your AI assistant with custom capabilities. Using C# attributes and reflection, the system automatically discovers and registers your tools—no manual configuration needed.
 
@@ -194,7 +196,7 @@ Mark your tool with `RequiresPolling = true` and specify a `PollAction` (typical
 
 1. **Start the work:** Return `new PendingResponse("message", pollIntervalSeconds)` to acknowledge the job has started. The poll interval tells the server how long to wait between checks.
 
-2. **Implement the poll action:** Create a method (like `Status`) that checks progress and returns `_mcp_status` of `pending`, `complete`, or `error`. **Important:** The middleware calls your `PollAction` string exactly as written—no automatic case conversion—so make sure your `HandleCommand` recognizes it.
+2. **Implement the poll action inside `HandleCommand`:** Check `@params["action"]` for your `PollAction` string, then run status logic that returns `_mcp_status` of `pending`, `complete`, or `error`. **Important:** The middleware calls your `PollAction` string exactly as written—no automatic case conversion—so make sure your `HandleCommand` recognizes it.
 
 3. **Persist your state:** Use `McpJobStateStore` to save progress to the `Library/` folder. This ensures your tool remembers what it was doing even after a domain reload wipes memory.
 
@@ -229,6 +231,12 @@ public static class BakeLightmaps
 
     public static object HandleCommand(JObject @params)
     {
+        var action = @params?["action"]?.ToString();
+        if (action == "status")
+        {
+            return GetStatus();
+        }
+
         if (s_isRunning)
         {
             var existing = McpJobStateStore.LoadState<State>(ToolName) ?? new State { lastStatus = "in_progress", progress = 0f };
@@ -245,7 +253,7 @@ public static class BakeLightmaps
         return new PendingResponse("Starting lightmap bake", 0.5, new { state.lastStatus, state.progress });
     }
 
-    public static object Status(JObject _)
+    private static object GetStatus()
     {
         var state = McpJobStateStore.LoadState<State>(ToolName) ?? new State { lastStatus = "unknown", progress = 0f };
 

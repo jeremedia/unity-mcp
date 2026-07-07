@@ -1,10 +1,13 @@
 # MCP for Unity — Editor Plugin Guide
 
-> **Status audit (2026-06-20):** General Unity MCP bridge editor guide,
+> **Status audit (2026-07-04):** General Unity MCP bridge editor guide,
 > source-refreshed against the current UI UXML/controllers, package metadata,
-> and server-launch/config builders. This is not CE-specific control-surface
-> authority. Python server tests passed; Unity/client runtime smoke tests were
-> not run.
+> server-launch/config builders, client configurators, and transport services.
+> This is not CE-specific control-surface authority. Python server tests passed
+> with 94 passed, 2 skipped, and 7 xpassed; a separate local FastMCP HTTP smoke
+> proved the Python server endpoint with Unity startup skipped. Unity package
+> import, Editor-window launch, client configuration, and Unity-attached runtime
+> smoke tests were not run.
 
 Use this guide to configure and run MCP for Unity inside the Unity Editor. Installation is covered elsewhere; this document focuses on the Editor window, client configuration, and troubleshooting.
 

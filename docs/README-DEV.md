@@ -1,10 +1,12 @@
 # MCP for Unity Development Tools
 
-> **Status audit (2026-06-20):** General Unity MCP development guide,
+> **Status audit (2026-07-04):** General Unity MCP development guide,
 > source-refreshed against `Server/pyproject.toml`, current Advanced Settings
 > UI, and checked-in dev scripts. This is not CE-specific control-surface
-> authority. `uv run --extra dev python -m pytest tests/ -q` passed; Unity
-> tests and CI were not run.
+> authority. `uv run --extra dev python -m pytest tests/ -q` passed with
+> 94 passed, 2 skipped, and 7 xpassed; a local FastMCP HTTP smoke proved the
+> Python server endpoint with Unity startup skipped. Unity tests, CI, stdio MCP
+> client smoke, Docker smoke, and Unity-attached tool execution were not run.
 
 | [English](README-DEV.md) | [简体中文](README-DEV-zh.md) |
 |---------------------------|------------------------------|
@@ -50,8 +52,9 @@ To run the current integration test tree:
 uv run --extra dev python -m pytest tests/integration/ -q
 ```
 
-This checkout does not define a separate `unit` pytest marker; targeted runs
-should select files or tests under `tests/integration/`.
+`Server/tests/pytest.ini` defines both `integration` and `unit` markers, but
+the current documented integration tree is selected by path. Use file, test, or
+marker selection only after confirming the target tests are annotated as needed.
 
 ## 🚀 Available Development Features
 
@@ -63,13 +66,13 @@ should select files or tests under `tests/integration/`.
   `apply_text_edits`, `script_apply_edits`, and `validate_script` are
   source-backed. The project-scoped `runtime_compilation` custom tool source
   exists under `CustomTools/RoslynRuntimeCompilation/` and is gated by
-  `USE_ROSLYN`; Unity import/runtime proof was not run in this pass.
+  `USE_ROSLYN`; Unity import/runtime proof was not run in this slice.
 - **Plugin Development Kit**: Covered by project-scoped Custom Tools.
 - **Automated Tests**: Python tests live under `Server/tests/`; Unity/CI guidance is documented later in this file.
 
 ### 🔄 Still planned or separately verified
 
-- **Debug Dashboard**: Advanced debugging and monitoring tools remain outside this source-checked pass.
+- **Debug Dashboard**: Advanced debugging and monitoring tools remain outside this source-checked slice.
 
 ---
 
@@ -131,9 +134,9 @@ Deploys your development code to the actual installation locations for testing.
 2. Enter Unity package cache path (example provided)
 3. Enter backup location (or use default: `%USERPROFILE%\Desktop\unity-mcp-backup`)
 
-**Note:** Dev deploy skips Python server deployment in this checkout. It also
-skips `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`; reduces
-churn and avoids copying virtualenvs if the server deploy is re-enabled later.
+**Note:** Dev deploy skips Python server deployment in this checkout. The
+server copy block is commented out in `deploy-dev.bat`, so there is no active
+server exclude/copy behavior to rely on unless that block is reimplemented.
 
 ### `restore-dev.bat`
 

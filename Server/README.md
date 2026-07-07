@@ -1,11 +1,18 @@
 # MCP for Unity Server
 
-> **Status audit (2026-06-20):** General Unity MCP server documentation,
+> **Status audit (2026-07-04):** General Unity MCP server documentation,
 > source-refreshed against `Server/pyproject.toml`, the Python tool/resource
-> registries, and current `uvx`/HTTP/stdio launch paths. This is not CE-specific
-> Builder control-surface authority. Source metadata and `Server/uv.lock` now
-> agree on `8.7.0`; `uv run --extra dev python -m pytest tests/ -q` passed.
-> Docker and Unity runtime smoke tests were not run.
+> registries, current `uvx`/HTTP/stdio launch paths, Dockerfile,
+> docker-compose.yml, and lockfile.
+> This is not CE-specific Builder control-surface authority. Source metadata
+> and `Server/uv.lock` agree on `8.7.0`; `uv run --extra dev python -m pytest
+> tests/ -q` passed with 94 passed, 2 skipped, and 7 xpassed; `uv run python
+> src/main.py --help` exits 0 and lists stdio/http transport flags. A local
+> FastMCP HTTP smoke with Unity startup skipped proved `/health`, tools/list,
+> resources/list, resource-template list, `debug_request_context`, and
+> `manage_editor telemetry_status` with telemetry disabled. Docker and Unity
+> runtime smoke tests, stdio MCP client smoke, Unity-attached tool execution,
+> clean-worktree proof, remote proof, and release proof were not run.
 
 [![MCP](https://badge.mcpx.dev?status=on 'MCP Enabled')](https://modelcontextprotocol.io/introduction)
 [![python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
@@ -109,7 +116,10 @@ docker run -p 8080:8080 unity-mcp-server
 Run the build command from the repository root. The checked-in
 `Server/Dockerfile` copies the repository into `/app`, switches to
 `/app/Server`, and starts `src/main.py` in HTTP mode on `0.0.0.0:8080` by
-default. Configure your MCP client with `"url": "http://localhost:8080/mcp"`.
+default. The checked-in `docker-compose.yml` uses `context: .`,
+`dockerfile: Server/Dockerfile`, maps `8080:8080`, and runs the same HTTP
+command, but no compose smoke was run in this slice. Configure your MCP client
+with `"url": "http://localhost:8080/mcp"`.
 
 ### Option 4: Local Development
 

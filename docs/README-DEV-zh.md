@@ -1,11 +1,14 @@
 # MCP for Unity 开发工具
 
-> **Status audit (2026-06-20):** 通用 Unity MCP 开发指南，已根据
+> **Status audit (2026-07-04):** 通用 Unity MCP 开发指南，已根据
 > `Server/pyproject.toml`、当前 Advanced Settings UI 和已检入开发脚本重新核对。
 > 本文现在包含英文指南中的依赖、测试和 Advanced Settings 要点，但仍以英文
 > `README-DEV.md` 作为完整文本；它不是 CE 专用 control-surface 权威。
-> `uv run --extra dev python -m pytest tests/ -q` 已通过；本轮未运行 Unity
-> tests 或 CI。
+> `uv run --extra dev python -m pytest tests/ -q` 已通过（94 passed、
+> 2 skipped、7 xpassed）；本轮在跳过 Unity startup 的条件下完成 local
+> FastMCP HTTP smoke，证明 Python server endpoint 可用。本轮未运行
+> Unity tests、CI、stdio MCP client smoke、Docker smoke 或 Unity-attached
+> tool execution。
 
 | [English](README-DEV.md) | [简体中文](README-DEV-zh.md) |
 |---------------------------|------------------------------|
@@ -47,8 +50,9 @@ cd Server && uv run --extra dev python -m pytest tests/ -q
 uv run --extra dev python -m pytest tests/integration/ -q
 ```
 
-当前 checkout 不定义单独的 `unit` pytest marker；如需定向运行，请选择
-`tests/integration/` 下的文件或测试。
+`Server/tests/pytest.ini` 定义了 `integration` 和 `unit` markers，但当前
+文档中的 integration tree 通过路径选择。使用文件、测试名或 marker 定向运行前，
+先确认目标测试已经按需要标注。
 
 ## 🚀 可用开发功能
 
@@ -65,7 +69,7 @@ uv run --extra dev python -m pytest tests/integration/ -q
 
 ### 🔄 仍待规划或需单独验证
 
-- **调试面板**：高级调试和监控工具不属于本轮 source-checked 范围。
+- **调试面板**：高级调试和监控工具不属于本轮 source-checked slice 范围。
 
 ---
 
@@ -128,7 +132,9 @@ python mcp_source.py [--manifest /path/to/manifest.json] [--repo /path/to/unity-
 2. 输入 Unity 包缓存路径（提供示例）
 3. 输入备份位置（或使用默认：`%USERPROFILE%\Desktop\unity-mcp-backup`）
 
-**注意:** 当前 checkout 的开发部署会跳过 Python 服务器部署。如果未来重新启用服务器部署，它还会跳过 `.venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.git`；减少变动并避免复制虚拟环境。
+**注意:** 当前 checkout 的开发部署会跳过 Python 服务器部署。`deploy-dev.bat`
+中的服务器复制区块已被注释掉；除非重新实现该区块，否则不要依赖任何有效的服务器
+exclude/copy 行为。
 
 ### `restore-dev.bat`
 从备份恢复原始文件。

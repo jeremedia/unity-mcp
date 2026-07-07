@@ -1,10 +1,15 @@
-> **Status audit (2026-06-20):** General Unity MCP bridge documentation,
+> **Status audit (2026-07-04):** General Unity MCP bridge documentation,
 > source-refreshed against `MCPForUnity/package.json`,
 > `Server/pyproject.toml`, the Python tool registry, Unity-side tool handlers,
-> and current client-config/server-launch builders. This is not CE-specific
-> Builder control-surface authority. Python server tests passed with
-> `uv run --extra dev python -m pytest tests/ -q`; Unity/client runtime smoke
-> tests were not run.
+> current client-config/server-launch builders, Dockerfile, telemetry source,
+> and dev docs. This is not CE-specific Builder control-surface authority.
+> Python server tests passed with `uv run --extra dev python -m pytest tests/ -q`
+> (94 passed, 2 skipped, 7 xpassed). A local FastMCP HTTP smoke with Unity
+> startup skipped proved `/health`, tools/list, resources/list,
+> resource-template list, `debug_request_context`, and
+> `manage_editor telemetry_status` with telemetry disabled. Unity/client/Docker
+> runtime smoke tests, stdio MCP client smoke, Unity-attached tool execution,
+> clean-worktree proof, remote proof, and release proof were not run.
 
 <img width="676" height="380" alt="MCP for Unity" src="docs/images/logo.png" />
 
@@ -430,7 +435,8 @@ MCP for Unity uses a Python MCP Server tied with Unity's C# scripts for tools. I
 MCP for Unity includes **privacy-focused, anonymous telemetry** to help us improve the product. We collect usage analytics and performance data, but **never** your code, project names, or personal information.
 
 - **🔒 Anonymous**: Random UUIDs only, no personal data
-- **🚫 Easy opt-out**: Set `DISABLE_TELEMETRY=true` environment variable
+- **🚫 Easy opt-out**: Set `DISABLE_TELEMETRY=true` before launching the server,
+  or use the Unity EditorPrefs opt-out path
 - **📖 Transparent**: See [TELEMETRY.md](docs/TELEMETRY.md) for full details
 
 Your privacy matters to us. All telemetry is optional and designed to respect your workflow.

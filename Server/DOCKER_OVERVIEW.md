@@ -1,12 +1,18 @@
 # MCP for Unity Server (Docker Image)
 
-> **Status audit (2026-06-20):** General Unity MCP bridge Docker
+> **Status audit (2026-07-04):** General Unity MCP bridge Docker
 > documentation, not CE-specific control-surface authority. Source-refreshed
 > against `Server/Dockerfile`, which starts the server in HTTP mode on
 > `0.0.0.0:8080` when built from the repository root with
-> `-f Server/Dockerfile`. `Server/pyproject.toml` and `Server/uv.lock` both
-> record `8.7.0`; this pass did not pull the published image, build the image,
-> or run a Docker smoke test.
+> `-f Server/Dockerfile`. `docker-compose.yml` uses the same repository-root
+> context, `Server/Dockerfile`, `8080:8080` port mapping, and HTTP
+> `0.0.0.0:8080` command. `Server/pyproject.toml` and `Server/uv.lock` both
+> record `8.7.0`; Python server tests passed with 94 passed, 2 skipped, and
+> 7 xpassed. A separate non-Docker local FastMCP HTTP smoke proved server
+> `/health`, tools/list, resources/list, one resource template,
+> `debug_request_context`, and `manage_editor telemetry_status` with Unity
+> startup skipped and telemetry disabled. This slice did not pull the published
+> image, build the image, run Docker Compose, or run a Docker smoke test.
 
 [![MCP](https://badge.mcpx.dev?status=on 'MCP Enabled')](https://modelcontextprotocol.io/introduction)
 [![License](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
@@ -44,6 +50,11 @@ Source caveat: Docker builds from this checkout use the frozen `uv.lock`, and
 the editable `mcpforunityserver` entry now matches `pyproject.toml` at
 `8.7.0`. Run a fresh build and container smoke test before treating the Docker
 image as verified-current.
+
+The checked-in `docker-compose.yml` builds from repository root with
+`dockerfile: Server/Dockerfile`, maps `8080:8080`, sets
+`PYTHONPATH=/app/Server/src`, and runs the same HTTP command. This compose path
+was source-checked only; no compose smoke was run in this slice.
 
 ### 3. Configure your MCP Client
 

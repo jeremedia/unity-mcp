@@ -1,11 +1,13 @@
 # MCP for Unity Telemetry
 
-> **Status audit (2026-06-20):** General Unity MCP bridge documentation, not
+> **Status audit (2026-07-04):** General Unity MCP bridge documentation, not
 > CE-specific control-surface authority. Source-rechecked against
 > `Server/src/core/telemetry.py`, `Server/src/core/config.py`,
 > `TelemetryHelper.cs`, `EditorPrefKeys.cs`, and `manage_editor.py`.
-> Python server tests passed; live telemetry transmission and Unity UI smoke
-> were not run.
+> Python server tests passed with 94 passed, 2 skipped, and 7 xpassed. A local
+> FastMCP HTTP smoke launched the server with telemetry disabled and
+> `manage_editor telemetry_status` returned `telemetry_enabled=false`; live
+> telemetry transmission and Unity UI smoke were not run.
 
 MCP for Unity includes privacy-focused, anonymous telemetry to help us improve the product. This document explains what data is collected, how to opt out, and our privacy practices.
 
@@ -13,7 +15,7 @@ MCP for Unity includes privacy-focused, anonymous telemetry to help us improve t
 
 - **Anonymous**: We use randomly generated UUIDs - no personal information
 - **Non-blocking**: Telemetry never interferes with your Unity workflow  
-- **Easy opt-out**: Simple environment variable or Unity Editor setting
+- **Easy opt-out**: Startup environment variable or Unity Editor setting
 - **Transparent**: All collected data types are documented here
 
 ## 📊 What We Collect
@@ -39,7 +41,8 @@ MCP for Unity includes privacy-focused, anonymous telemetry to help us improve t
 ## 🚫 How to Opt Out
 
 ### Method 1: Environment Variable (Recommended)
-Set any of these environment variables to `true`:
+Set any of these environment variables to `true` before the Python server
+process starts, or before `TelemetryConfig` is constructed:
 
 ```bash
 # Disable all telemetry
@@ -52,14 +55,19 @@ export UNITY_MCP_DISABLE_TELEMETRY=true
 export MCP_DISABLE_TELEMETRY=true
 ```
 
+Python telemetry reads these variables when the collector is initialized; an
+already-running server process needs a restart for environment changes to take
+effect.
+
 ### Method 2: Unity EditorPrefs
 Unity-side telemetry honors the `MCPForUnity.TelemetryDisabled` EditorPrefs key.
 Use `Window > MCP For Unity > Edit EditorPrefs` to inspect or set it, or call
 `TelemetryHelper.DisableTelemetry()` from editor code. No main Settings-tab
-checkbox was source-verified in this pass.
+checkbox was source-verified in this slice.
 
 ### Method 3: Manual Config
-Add to your MCP client config:
+For stdio or command-based client configs where the client launches the Python
+server process, add:
 ```json
 {
   "env": {
@@ -67,6 +75,8 @@ Add to your MCP client config:
   }
 }
 ```
+HTTP URL-only client configs connect to an already-running server and do not set
+environment variables for that server process.
 
 ## 🔧 Technical Implementation
 
@@ -90,8 +100,16 @@ Files created:
 ### Data Transmission
 - **Endpoint**: `https://api-prod.coplay.dev/telemetry/events`
 - **Method**: HTTPS POST with JSON payload
-- **Retry**: Background thread with graceful failure
-- **Timeout**: 10 second timeout, no retries on failure
+- **Send behavior**: Bounded background queue with one worker; each queued
+  record is sent once and failures are logged without interrupting tool
+  execution. No retry/backoff loop is source-verified.
+- **Timeout**: Normal `src/main.py` server startup defaults
+  `UNITY_MCP_TELEMETRY_TIMEOUT` to 5.0 seconds when the variable is unset. The
+  raw `TelemetryConfig` fallback is 1.5 seconds if it is constructed outside
+  that entrypoint.
+- **Endpoint override**: `UNITY_MCP_TELEMETRY_ENDPOINT` accepts `http` or
+  `https` URLs with a network host. Localhost/loopback or invalid values fall
+  back to the default endpoint.
 
 ## 📈 How We Use This Data
 
@@ -117,7 +135,7 @@ Files created:
 
 ### Custom Telemetry Events
 ```python
-core.telemetry import record_telemetry, RecordType
+from core.telemetry import record_telemetry, RecordType
 
 record_telemetry(RecordType.USAGE, {
     "custom_event": "my_feature_used",
@@ -127,7 +145,7 @@ record_telemetry(RecordType.USAGE, {
 
 ### Telemetry Status Check
 ```python  
-core.telemetry import is_telemetry_enabled
+from core.telemetry import is_telemetry_enabled
 
 if is_telemetry_enabled():
     print("Telemetry is active")
@@ -140,7 +158,8 @@ else:
 - **Aggregated Data**: Retained indefinitely for product insights
 - **Raw Events**: Automatically purged after 90 days
 - **Personal Data**: None collected, so none to purge
-- **Opt-out**: Immediate - no data sent after opting out
+- **Opt-out**: Effective for new Python server processes started with opt-out
+  env vars set, or through the Unity-side EditorPrefs opt-out path
 
 ## 🤝 Contact & Transparency
 
@@ -160,7 +179,8 @@ Here's what a typical telemetry event looks like:
   "customer_uuid": "550e8400-e29b-41d4-a716-446655440000", 
   "session_id": "abc123-def456-ghi789",
   "version": "8.7.0",
-  "platform": "posix",
+  "platform": "Darwin",
+  "source": "darwin",
   "data": {
     "tool_name": "manage_script",
     "success": true,
